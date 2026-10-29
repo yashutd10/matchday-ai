@@ -53,7 +53,7 @@ async function MatchPreview({ params }: { params: Params }) {
         </div>
         <div className="flex flex-col items-center gap-1">
           <span className="text-[11px] tracking-wider text-muted">AI PREDICTION</span>
-          <span className="font-display text-6xl font-bold leading-none text-lime md:text-8xl">{f.prediction[0]} – {f.prediction[1]}</span>
+          <span className="whitespace-nowrap font-display text-6xl font-bold leading-none text-lime md:text-8xl">{f.prediction[0]} – {f.prediction[1]}</span>
           <span className="text-[11px] text-muted">Confidence: {f.confidence.toLowerCase()}</span>
         </div>
         <div className="flex w-24 flex-col items-center gap-2">

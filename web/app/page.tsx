@@ -30,15 +30,15 @@ export default async function Home() {
                 <span className="text-sm text-muted">{pick.kickoff}</span>
               </div>
               <div className="flex items-center justify-between">
-                <div className="flex w-24 flex-col items-center gap-2 md:w-28">
+                <div className="flex w-24 shrink-0 flex-col items-center gap-2 lg:w-28">
                   <Crest team={pick.home} size="lg" />
                   <span className="text-center text-sm font-semibold md:text-base">{pick.home.name}</span>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="text-[11px] tracking-wider text-muted">PREDICTED</span>
-                  <span className="font-display text-5xl font-bold leading-none md:text-7xl">{pick.prediction[0]} – {pick.prediction[1]}</span>
+                  <span className="whitespace-nowrap font-display text-5xl font-bold leading-none lg:text-7xl">{pick.prediction[0]} – {pick.prediction[1]}</span>
                 </div>
-                <div className="flex w-24 flex-col items-center gap-2 md:w-28">
+                <div className="flex w-24 shrink-0 flex-col items-center gap-2 lg:w-28">
                   <Crest team={pick.away} size="lg" />
                   <span className="text-center text-sm font-semibold md:text-base">{pick.away.name}</span>
                 </div>
@@ -71,7 +71,7 @@ export default async function Home() {
                       <span className="text-xs text-muted">{f.kickoff}</span>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="font-display text-[22px] font-bold leading-none">{f.prediction[0]} – {f.prediction[1]}</span>
+                      <span className="whitespace-nowrap font-display text-[22px] font-bold leading-none">{f.prediction[0]} – {f.prediction[1]}</span>
                       <span className="text-[11px] text-muted">{f.confidence} confidence</span>
                     </div>
                   </Link>

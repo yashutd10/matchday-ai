@@ -74,7 +74,7 @@ export function YourTeamCard({ fixtures }: { fixtures: Fixture[] }) {
         <span className="text-xs text-muted">{f.kickoff}</span>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className="font-display text-[22px] font-bold leading-none">{f.prediction[0]} – {f.prediction[1]}</span>
+        <span className="whitespace-nowrap font-display text-[22px] font-bold leading-none">{f.prediction[0]} – {f.prediction[1]}</span>
         <span className="text-[11px] text-muted">{f.confidence} confidence</span>
       </div>
     </Link>

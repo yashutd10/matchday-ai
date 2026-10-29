@@ -80,3 +80,9 @@ export function YourTeamCard({ fixtures }: { fixtures: Fixture[] }) {
     </Link>
   );
 }
+
+export function FavouriteRowMarker({ tla }: { tla: string }) {
+  const fav = useFavourite();
+  if (fav !== tla) return null;
+  return <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold tracking-wider text-pitch">YOUR TEAM</span>;
+}

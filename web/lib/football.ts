@@ -276,6 +276,7 @@ export type TableRow = {
   team: string; tla: string; played: number; won: number; drawn: number; lost: number;
   gf: number; ga: number; points: number; form: string;
   home: string; away: string;
+  homePts: number; awayPts: number;
 };
 
 export async function getLeagueTable(): Promise<TableRow[] | null> {
@@ -295,6 +296,8 @@ export async function getLeagueTable(): Promise<TableRow[] | null> {
         form: r.results.slice(-5).join(""),
         home: `W${r.homeW} D${r.homeD} L${r.homeL}, ${r.homeGF}-${r.homeGA}`,
         away: `W${r.awayW} D${r.awayD} L${r.awayL}, ${r.awayGF}-${r.awayGA}`,
+        homePts: 3 * r.homeW + r.homeD,
+        awayPts: 3 * r.awayW + r.awayD,
       };
     })
     .sort((a, b) => b.points - a.points || b.gf - b.ga - (a.gf - a.ga) || b.gf - a.gf);
@@ -306,4 +309,60 @@ export async function getTeams(): Promise<{ name: string; tla: string }[]> {
   const seen = new Map<string, string>();
   for (const f of sampleFixtures) { seen.set(f.home.short, f.home.name); seen.set(f.away.short, f.away.name); }
   return [...seen].map(([tla, name]) => ({ name, tla })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/* ---------- players ---------- */
+
+export type Scorer = {
+  name: string;
+  position: string | null;
+  nationality: string | null;
+  team: string;
+  tla: string;
+  played: number;
+  goals: number;
+  assists: number;
+  penalties: number;
+};
+
+type ApiScorer = {
+  player: { name: string; position?: string | null; section?: string | null; nationality?: string | null };
+  team: { shortName: string; tla: string };
+  playedMatches?: number | null;
+  goals?: number | null;
+  assists?: number | null;
+  penalties?: number | null;
+};
+
+/** Top scorers this season (with assists), cached for an hour. Null when unavailable. */
+export async function getScorers(): Promise<Scorer[] | null> {
+  "use cache";
+  cacheLife("hours");
+
+  const key = process.env.FOOTBALL_DATA_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.football-data.org/v4/competitions/PL/scorers?limit=50", {
+      headers: { "X-Auth-Token": key },
+    });
+    if (!res.ok) {
+      console.error(`football-data.org responded ${res.status} for scorers`);
+      return null;
+    }
+    const { scorers } = (await res.json()) as { scorers: ApiScorer[] };
+    return scorers.map((s) => ({
+      name: s.player.name,
+      position: s.player.section ?? s.player.position ?? null,
+      nationality: s.player.nationality ?? null,
+      team: s.team.shortName,
+      tla: s.team.tla,
+      played: s.playedMatches ?? 0,
+      goals: s.goals ?? 0,
+      assists: s.assists ?? 0,
+      penalties: s.penalties ?? 0,
+    }));
+  } catch (err) {
+    console.error("Failed to load scorers", err);
+    return null;
+  }
 }

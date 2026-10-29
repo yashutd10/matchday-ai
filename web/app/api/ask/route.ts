@@ -1,11 +1,11 @@
-import { getLeagueTable, getMatchday } from "@/lib/football";
+import { getLeagueTable, getMatchday, getScorers } from "@/lib/football";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const MODEL = "claude-haiku-5-5";
 
 async function buildContext() {
-  const [table, md] = await Promise.all([getLeagueTable(), getMatchday()]);
+  const [table, md, scorers] = await Promise.all([getLeagueTable(), getMatchday(), getScorers()]);
   const lines: string[] = [];
   if (table) {
     lines.push("PREMIER LEAGUE TABLE (pos. team | P W D L | GF-GA | Pts | last 5 oldest→newest | home record | away record)");
@@ -18,6 +18,10 @@ async function buildContext() {
   lines.push("", `GAMEWEEK ${md.gameweek.number} FIXTURES (${md.source === "live" ? "live" : "sample"} data), with this app's model prediction:`);
   for (const f of md.fixtures) {
     lines.push(`- ${f.home.name} vs ${f.away.name}, ${f.kickoff}: predicted ${f.prediction[0]}-${f.prediction[1]} (home ${f.probs.home}%, draw ${f.probs.draw}%, away ${f.probs.away}%, ${f.confidence} confidence)`);
+  }
+  if (scorers?.length) {
+    lines.push("", "TOP SCORERS (name | team | position | games | goals | assists | penalties)");
+    for (const p of scorers) lines.push(`${p.name} | ${p.team} | ${p.position ?? "-"} | ${p.played} | ${p.goals} | ${p.assists} | ${p.penalties}`);
   }
   return lines.join("\n");
 }
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   const system = `You are Matchday AI, a sharp, friendly Premier League analyst inside a match-preview app for fans in India.
-Answer using the data below. If the data doesn't cover something (injuries, transfers, xG, player stats), say so plainly instead of guessing.
+Answer using the data below. If the data doesn't cover something (injuries, transfers, xG, players outside the top-scorer list), say so plainly instead of guessing.
 Keep answers short: 2-5 sentences or a few bullets, plain text, no markdown headings. Quote specific numbers from the data.
 Never encourage betting.
 

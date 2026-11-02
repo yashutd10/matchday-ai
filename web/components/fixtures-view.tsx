@@ -1,10 +1,7 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type { SeasonGameweek, SeasonMatch } from "@/lib/football";
+import { getSeasonFixtures, type SeasonGameweek, type SeasonMatch } from "@/lib/football";
 import { Icon } from "@/components/nav";
-import { useFavourite } from "@/components/favourite";
+import { FavBadge, ScrollActiveIntoView } from "@/components/fixtures-client";
 
 function Verdict({ m }: { m: SeasonMatch }) {
   const p = m.prediction;
@@ -26,22 +23,18 @@ function Verdict({ m }: { m: SeasonMatch }) {
   );
 }
 
-function MatchCard({ m, fav }: { m: SeasonMatch; fav: string }) {
-  const isFav = fav && (m.home.tla === fav || m.away.tla === fav);
+function MatchCard({ m }: { m: SeasonMatch }) {
   const done = m.state === "finished" || m.state === "live";
-  const rows = [
-    { t: m.home, g: m.score?.[0] },
-    { t: m.away, g: m.score?.[1] },
-  ];
+  const rows = [{ t: m.home, g: m.score?.[0] }, { t: m.away, g: m.score?.[1] }];
   const win = m.score ? (m.score[0] > m.score[1] ? 0 : m.score[1] > m.score[0] ? 1 : -1) : -1;
 
   const body = (
     <>
-      <div className="flex items-center justify-between text-[11px] text-muted">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
         <span>{m.state === "postponed" ? "Date to be confirmed" : `${m.time} IST`}</span>
+        <FavBadge tlas={[m.home.tla, m.away.tla]} />
         {m.state === "live" && <span className="flex items-center gap-1.5 font-semibold text-[#ff6b6b]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff6b6b]" />LIVE</span>}
         {m.state === "finished" && <span>FT</span>}
-        {isFav && <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold text-pitch">YOUR TEAM</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.map((r, i) => (
@@ -59,7 +52,7 @@ function MatchCard({ m, fav }: { m: SeasonMatch; fav: string }) {
     </>
   );
 
-  const cls = `flex h-full flex-col gap-2.5 rounded-2xl border bg-card px-4 py-3.5 ${isFav ? "border-lime/50" : "border-line"}`;
+  const cls = "flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-card px-4 py-3.5";
   return m.hasPreview ? (
     <Link href={`/match/${m.id}`} className={`${cls} transition hover:-translate-y-0.5 hover:border-[#3a4656]`}>{body}</Link>
   ) : (
@@ -67,64 +60,48 @@ function MatchCard({ m, fav }: { m: SeasonMatch; fav: string }) {
   );
 }
 
-export function FixturesBrowser({ gameweeks, current }: { gameweeks: SeasonGameweek[]; current: number }) {
-  const [gw, setGw] = useState(current);
-  const fav = useFavourite();
-  const pillRef = useRef<HTMLButtonElement>(null);
-  const idx = gameweeks.findIndex((g) => g.number === gw);
-  const week = gameweeks[idx];
+const arrowCls = "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-soft transition hover:text-ink";
 
-  useEffect(() => {
-    pillRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [gw]);
-
-  if (!week) return null;
+export function FixturesView({ weeks, week, current }: { weeks: Pick<SeasonGameweek, "number" | "state">[]; week: SeasonGameweek; current: number }) {
+  const idx = weeks.findIndex((g) => g.number === week.number);
+  const prev = weeks[idx - 1], next = weeks[idx + 1];
   const finished = week.matches.filter((m) => m.state === "finished");
   const called = finished.filter((m) => m.prediction?.correct).length;
-
   const byDate = week.matches.reduce<Record<string, SeasonMatch[]>>((acc, m) => {
-    const key = m.state === "postponed" ? "Postponed" : m.date;
-    (acc[key] ??= []).push(m);
+    (acc[m.state === "postponed" ? "Postponed" : m.date] ??= []).push(m);
     return acc;
   }, {});
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-2">
-        <button type="button" aria-label="Previous gameweek" disabled={idx <= 0} onClick={() => setGw(gameweeks[idx - 1].number)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-soft transition hover:text-ink disabled:opacity-40">
-          <Icon d="M15 18l-6-6 6-6" />
-        </button>
-        <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-1 [scrollbar-width:none]" role="tablist" aria-label="Gameweeks">
-          {gameweeks.map((g) => {
-            const active = g.number === gw;
+      <nav className="flex items-center gap-2" aria-label="Gameweeks">
+        {prev ? <Link href={`/fixtures/${prev.number}`} aria-label="Previous gameweek" className={arrowCls}><Icon d="M15 18l-6-6 6-6" /></Link> : <span className={`${arrowCls} opacity-40`} aria-hidden="true"><Icon d="M15 18l-6-6 6-6" /></span>}
+        <div id="gw-strip" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] md:flex-wrap md:overflow-visible md:px-0 md:[mask-image:none]">
+          {weeks.map((g) => {
+            const active = g.number === week.number;
             return (
-              <button
+              <Link
                 key={g.number}
-                ref={active ? pillRef : undefined}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setGw(g.number)}
+                href={`/fixtures/${g.number}`}
+                aria-current={active ? "page" : undefined}
+                data-active={active || undefined}
                 className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-semibold transition ${active ? "bg-lime text-pitch" : g.state === "finished" ? "bg-card text-soft hover:text-ink" : "border border-line text-muted hover:text-ink"} ${g.number === current && !active ? "ring-1 ring-lime/60" : ""}`}
               >
                 {g.number}
-              </button>
+              </Link>
             );
           })}
         </div>
-        <button type="button" aria-label="Next gameweek" disabled={idx >= gameweeks.length - 1} onClick={() => setGw(gameweeks[idx + 1].number)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-soft transition hover:text-ink disabled:opacity-40">
-          <Icon d="M9 18l6-6-6-6" />
-        </button>
-      </div>
+        {next ? <Link href={`/fixtures/${next.number}`} aria-label="Next gameweek" className={arrowCls}><Icon d="M9 18l6-6-6-6" /></Link> : <span className={`${arrowCls} opacity-40`} aria-hidden="true"><Icon d="M9 18l6-6-6-6" /></span>}
+      </nav>
+      <ScrollActiveIntoView containerId="gw-strip" />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-3xl font-bold leading-none md:text-4xl">Gameweek {week.number}</h2>
           <p className="mt-1 text-sm text-muted">
             {week.state === "finished" ? "Full time" : week.state === "current" ? "In progress" : "Upcoming"}
-            {gw !== current && (
-              <button type="button" onClick={() => setGw(current)} className="ml-3 text-lime hover:underline">Jump to this week</button>
-            )}
+            {week.number !== current && <Link href="/fixtures" className="ml-3 text-lime hover:underline">Jump to this week</Link>}
           </p>
         </div>
         {finished.length > 0 && (
@@ -139,10 +116,31 @@ export function FixturesBrowser({ gameweeks, current }: { gameweeks: SeasonGamew
         <section key={date} className="flex flex-col gap-2.5">
           <h3 className="text-xs font-semibold tracking-wider text-muted uppercase">{date}</h3>
           <ul className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
-            {ms.map((m) => <li key={m.id}><MatchCard m={m} fav={fav} /></li>)}
+            {ms.map((m) => <li key={m.id}><MatchCard m={m} /></li>)}
           </ul>
         </section>
       ))}
     </div>
   );
 }
+
+export function FixturesShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-5 pt-8 pb-10 md:px-8 md:pt-12">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Fixtures &amp; Results</h1>
+        <p className="text-sm text-soft md:text-base">Every gameweek this season. Results show what the AI predicted before kickoff; upcoming matches show its current call. Times in IST.</p>
+      </div>
+      {children}
+    </main>
+  );
+}
+
+export async function FixturesFor({ gw }: { gw?: number }) {
+  const data = await getSeasonFixtures();
+  if (!data) return <p className="text-soft">Fixtures need live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>;
+  const week = data.gameweeks.find((g) => g.number === (gw ?? data.current));
+  if (!week) return <p className="text-soft">There&apos;s no gameweek {gw} this season.</p>;
+  return <FixturesView weeks={data.gameweeks.map(({ number, state }) => ({ number, state }))} week={week} current={data.current} />;
+}
+

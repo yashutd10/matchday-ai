@@ -53,7 +53,9 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
  */
 export async function getSeasonMatches(season?: number): Promise<ApiMatch[] | null> {
   "use cache";
-  cacheLife("hours");
+  // Last season never changes, so refresh it daily; this season refreshes every 5 minutes.
+  if (season) cacheLife("days");
+  else cacheLife("matchday");
 
   const key = process.env.FOOTBALL_DATA_KEY;
   if (!key) return null;

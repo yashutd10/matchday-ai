@@ -1,4 +1,7 @@
 import { getAccuracy } from "@/lib/football";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Accuracy" };
 
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
@@ -14,14 +17,15 @@ export default async function AccuracyPage() {
     );
   }
 
-  const v2 = pct(acc.v2.correct, acc.total);
+  const live = acc[acc.live];
+  const v2 = pct(live.correct, acc.total);
   const v1 = pct(acc.v1.correct, acc.total);
   const base = pct(acc.homeBaseline, acc.total);
   const diff = v2 - base;
 
   const cards = [
-    { label: "Results called right", value: `${v2}%`, note: `${acc.v2.correct} of ${acc.total} matches` },
-    { label: "Exact scores", value: `${pct(acc.v2.exact, acc.total)}%`, note: `${acc.v2.exact} spot on` },
+    { label: "Results called right", value: `${v2}%`, note: `${live.correct} of ${acc.total} matches` },
+    { label: "Exact scores", value: `${pct(live.exact, acc.total)}%`, note: `${live.exact} spot on` },
     {
       label: "vs “always back home”",
       value: `${diff > 0 ? "+" : ""}${diff} pts`,
@@ -30,11 +34,19 @@ export default async function AccuracyPage() {
   ];
 
   const rows = [
-    { name: "New model (v2)", acc: v2, exact: pct(acc.v2.exact, acc.total), brier: acc.v2.brier.toFixed(3), highlight: true },
-    { name: "Old model (v1)", acc: v1, exact: pct(acc.v1.exact, acc.total), brier: acc.v1.brier.toFixed(3) },
-    { name: "Always back home", acc: base, exact: null, brier: null },
-    { name: "Random guess", acc: 33, exact: null, brier: "0.667" },
-  ];
+    { name: "v3: recent form weighted", key: "v3" as const },
+    { name: "v2: season + last season", key: "v2" as const },
+    { name: "v1: first version", key: "v1" as const },
+  ].map((r) => ({
+    name: r.name + (acc.live === r.key ? " (live)" : ""),
+    acc: pct(acc[r.key].correct, acc.total),
+    exact: pct(acc[r.key].exact, acc.total) as number | null,
+    brier: acc[r.key].brier.toFixed(3) as string | null,
+    highlight: acc.live === r.key,
+  })).concat([
+    { name: "Always back home", acc: base, exact: null, brier: null, highlight: false },
+    { name: "Random guess", acc: 33, exact: null, brier: "0.667", highlight: false },
+  ]);
 
   const maxPerGw = Math.max(...acc.gameweeks.map((g) => g.total), 1);
 
@@ -45,6 +57,7 @@ export default async function AccuracyPage() {
         <p className="max-w-2xl text-sm leading-relaxed text-soft md:text-base">
           The model replays the season. Before each gameweek it only sees earlier results, predicts the round, then gets checked against what actually happened.
           {acc.usedLastSeason ? " It also starts from last season's results." : " Last season's results weren't available, so it starts from scratch."}
+          {` The live site uses whichever model has the better Brier score, currently ${acc.live === "v3" ? "v3 (recent form weighted)" : "v2"}.`}
         </p>
       </div>
 
@@ -96,15 +109,15 @@ export default async function AccuracyPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-display text-2xl font-bold">Correct results by gameweek</h2>
           <div className="flex items-center gap-4 text-xs text-soft">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-lime" /> New model</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#5b6573]" /> Old model</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-lime" /> Live model ({acc.live})</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#5b6573]" /> First version (v1)</span>
           </div>
         </div>
-        <div className="flex h-48 items-end gap-3" role="img" aria-label={`Correct predictions per gameweek, new vs old model: ${acc.gameweeks.map((g) => `GW${g.number} ${g.v2} vs ${g.v1} of ${g.total}`).join(", ")}`}>
+        <div className="flex h-48 items-end gap-3" role="img" aria-label={`Correct predictions per gameweek, new vs old model: ${acc.gameweeks.map((g) => `GW${g.number} ${g[acc.live]} vs ${g.v1} of ${g.total}`).join(", ")}`}>
           {acc.gameweeks.map((g) => (
             <div key={g.number} className="flex flex-1 flex-col items-center gap-1.5">
               <div className="flex w-full items-end justify-center gap-1">
-                {[{ v: g.v2, cls: "bg-lime", t: "text-soft" }, { v: g.v1, cls: "bg-[#5b6573]", t: "text-muted" }].map((b, i) => (
+                {[{ v: g[acc.live], cls: "bg-lime", t: "text-soft" }, { v: g.v1, cls: "bg-[#5b6573]", t: "text-muted" }].map((b, i) => (
                   <div key={i} className="flex w-full max-w-6 flex-col items-center gap-1">
                     <span className={`text-[11px] font-semibold ${b.t}`}>{b.v}</span>
                     <div className={`w-full rounded-t-md ${b.cls}`} style={{ height: `${Math.max(4, (b.v / maxPerGw) * 130)}px` }} />

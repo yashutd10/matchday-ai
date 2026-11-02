@@ -1,4 +1,7 @@
 import { getScorers, type Scorer } from "@/lib/football";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Player Stats" };
 
 function Leaderboard({ title, players, stat, unit }: { title: string; players: Scorer[]; stat: (p: Scorer) => number; unit: string }) {
   const max = Math.max(...players.map(stat), 1);

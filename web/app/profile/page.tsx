@@ -1,5 +1,8 @@
 import { getTeams } from "@/lib/football";
 import { TeamPicker } from "@/components/favourite";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Your Team" };
 
 export default async function ProfilePage() {
   const teams = await getTeams();

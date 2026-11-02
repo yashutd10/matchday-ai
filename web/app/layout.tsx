@@ -12,8 +12,10 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Matchday AI",
-  description: "AI-powered Premier League match previews and predictions",
+  metadataBase: new URL("https://matchday-ai-theta.vercel.app"),
+  title: { default: "Matchday AI", template: "%s · Matchday AI" },
+  description: "Premier League predictions you can actually check: match previews, live table, player stats and a backtested accuracy tracker. Kickoffs in IST.",
+  openGraph: { siteName: "Matchday AI", type: "website" },
 };
 
 export const viewport: Viewport = { themeColor: "#0b0f14" };

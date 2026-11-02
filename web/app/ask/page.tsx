@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import { AskChat } from "@/components/ask-chat";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Ask AI" };
 
 async function Chat({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;

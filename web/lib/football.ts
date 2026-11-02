@@ -80,6 +80,17 @@ const toTrain = (ms: ApiMatch[], weight: number): TrainMatch[] =>
     home: m.homeTeam.id, away: m.awayTeam.id, hg: m.score.fullTime.home!, ag: m.score.fullTime.away!, weight,
   }));
 
+/**
+ * v3: recent form counts more. A match's weight halves every RECENCY_HALF_LIFE gameweeks,
+ * so a result from 5 gameweeks ago counts half as much as last week's.
+ */
+const RECENCY_HALF_LIFE = 5;
+const toTrainRecent = (ms: ApiMatch[], target: number): TrainMatch[] =>
+  ms.filter(isFinished).map((m) => ({
+    home: m.homeTeam.id, away: m.awayTeam.id, hg: m.score.fullTime.home!, ag: m.score.fullTime.away!,
+    weight: 0.5 ** ((target - m.matchday - 1) / RECENCY_HALF_LIFE),
+  }));
+
 /** Last season counts for 40% of a match this season: a useful starting point that fades as games are played. */
 const LAST_SEASON_WEIGHT = 0.4;
 
@@ -171,9 +182,11 @@ export async function getMatchday(): Promise<Matchday> {
 
   const finished = current.filter(isFinished);
   const recs = buildRecords(finished);
-  const predictor = fitV2([...prevTrain, ...toTrain(finished, 1)], promoted);
-
   const md = upcoming[0].matchday;
+  const acc = await getAccuracy();
+  const recent = acc?.live === "v3";
+  const predictor = fitV2([...prevTrain, ...(recent ? toTrainRecent(finished, md) : toTrain(finished, 1))], promoted);
+
   const round = upcoming.filter((m) => m.matchday === md);
   const built = round.map((m) => buildFixture(m, recs, predictor));
 
@@ -203,16 +216,23 @@ export type PastPrediction = {
 };
 
 export type ModelScore = { correct: number; exact: number; brier: number };
+export type ModelKey = "v1" | "v2" | "v3";
 
 export type Accuracy = {
   total: number;
   v1: ModelScore;
   v2: ModelScore;
+  v3: ModelScore;
+  /** The model the live site uses: whichever of v2/v3 has the better Brier score. */
+  live: "v2" | "v3";
   homeBaseline: number;
   usedLastSeason: boolean;
-  gameweeks: { number: number; total: number; v1: number; v2: number }[];
+  gameweeks: { number: number; total: number; v1: number; v2: number; v3: number }[];
   latest: { number: number; predictions: PastPrediction[] } | null;
 };
+
+/** Below this many backtested matches the evidence is too thin to switch models. */
+const MIN_MATCHES_TO_SWITCH = 50;
 
 /**
  * Replays the season: before each finished gameweek, each model only sees the
@@ -228,44 +248,57 @@ export async function getAccuracy(): Promise<Accuracy | null> {
 
   const score = (): ModelScore => ({ correct: 0, exact: 0, brier: 0 });
   const acc: Accuracy = {
-    total: 0, v1: score(), v2: score(), homeBaseline: 0,
+    total: 0, v1: score(), v2: score(), v3: score(), live: "v2", homeBaseline: 0,
     usedLastSeason: prevTrain.length > 0, gameweeks: [], latest: null,
   };
 
-  for (const md of mds) {
-    const before = toTrain(finished.filter((m) => m.matchday < md), 1);
-    const p1 = fitV1(before);
-    const p2 = fitV2([...prevTrain, ...before], promoted);
-    const gw = { number: md, total: 0, v1: 0, v2: 0 };
-    const preds: PastPrediction[] = [];
+  const perGw: { md: number; matches: ApiMatch[]; preds: Record<ModelKey, ReturnType<Predictor>[]> }[] = [];
 
-    for (const m of finished.filter((x) => x.matchday === md)) {
+  for (const md of mds) {
+    const earlier = finished.filter((m) => m.matchday < md);
+    const before = toTrain(earlier, 1);
+    const models: Record<ModelKey, Predictor> = {
+      v1: fitV1(before),
+      v2: fitV2([...prevTrain, ...before], promoted),
+      v3: fitV2([...prevTrain, ...toTrainRecent(earlier, md)], promoted),
+    };
+    const gw = { number: md, total: 0, v1: 0, v2: 0, v3: 0 };
+    const round = finished.filter((x) => x.matchday === md);
+    const preds: Record<ModelKey, ReturnType<Predictor>[]> = { v1: [], v2: [], v3: [] };
+
+    for (const m of round) {
       const actual: [number, number] = [m.score.fullTime.home!, m.score.fullTime.away!];
       const o = outcomeOf(...actual);
-      const a = p1(m.homeTeam.id, m.awayTeam.id);
-      const b = p2(m.homeTeam.id, m.awayTeam.id);
-
       acc.total++; gw.total++;
       if (o === "H") acc.homeBaseline++;
-      if (a.top === o) { acc.v1.correct++; gw.v1++; }
-      if (b.top === o) { acc.v2.correct++; gw.v2++; }
-      if (a.score[0] === actual[0] && a.score[1] === actual[1]) acc.v1.exact++;
-      const exact = b.score[0] === actual[0] && b.score[1] === actual[1];
-      if (exact) acc.v2.exact++;
-      acc.v1.brier += brier(a, o);
-      acc.v2.brier += brier(b, o);
-
-      preds.push({
-        id: m.id, home: m.homeTeam.shortName, away: m.awayTeam.shortName,
-        predicted: b.score, actual, correct: b.top === o, exact,
-      });
+      for (const k of ["v1", "v2", "v3"] as const) {
+        const p = models[k](m.homeTeam.id, m.awayTeam.id);
+        preds[k].push(p);
+        if (p.top === o) { acc[k].correct++; gw[k]++; }
+        if (p.score[0] === actual[0] && p.score[1] === actual[1]) acc[k].exact++;
+        acc[k].brier += brier(p, o);
+      }
     }
     acc.gameweeks.push(gw);
-    acc.latest = { number: md, predictions: preds };
+    perGw.push({ md, matches: round, preds });
   }
-  if (acc.total) {
-    acc.v1.brier /= acc.total;
-    acc.v2.brier /= acc.total;
+
+  if (acc.total) for (const k of ["v1", "v2", "v3"] as const) acc[k].brier /= acc.total;
+  acc.live = acc.total >= MIN_MATCHES_TO_SWITCH && acc.v3.brier < acc.v2.brier ? "v3" : "v2";
+
+  const last = perGw[perGw.length - 1];
+  if (last) {
+    acc.latest = {
+      number: last.md,
+      predictions: last.matches.map((m, i) => {
+        const p = last.preds[acc.live][i];
+        const actual: [number, number] = [m.score.fullTime.home!, m.score.fullTime.away!];
+        return {
+          id: m.id, home: m.homeTeam.shortName, away: m.awayTeam.shortName, predicted: p.score, actual,
+          correct: p.top === outcomeOf(...actual), exact: p.score[0] === actual[0] && p.score[1] === actual[1],
+        };
+      }),
+    };
   }
   return acc;
 }

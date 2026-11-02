@@ -63,16 +63,23 @@ export default async function Home() {
             <ul className="grid gap-2.5 lg:grid-cols-2 lg:gap-3">
               {rest.map((f) => (
                 <li key={f.id}>
-                  <Link href={`/match/${f.id}`} className="flex h-full items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[#3a4656]">
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-[15px] font-semibold">
-                        {f.home.name} <span className="font-normal text-muted">vs</span> {f.away.name}
-                      </span>
-                      <span className="text-xs text-muted">{f.kickoff}</span>
+                  <Link href={`/match/${f.id}`} className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-card px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[#3a4656]">
+                    <div className="flex flex-col gap-1.5">
+                      {[
+                        { team: f.home, goals: f.prediction[0], win: f.probs.home },
+                        { team: f.away, goals: f.prediction[1], win: f.probs.away },
+                      ].map((row) => (
+                        <div key={row.team.short} className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1e2632] font-display text-[11px] font-bold">{row.team.short}</span>
+                          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight">{row.team.name}</span>
+                          <span className="text-[11px] text-muted">{row.win}%</span>
+                          <span className="w-5 text-right font-display text-[22px] font-bold leading-none">{row.goals}</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="whitespace-nowrap font-display text-[22px] font-bold leading-none">{f.prediction[0]} – {f.prediction[1]}</span>
-                      <span className="text-[11px] text-muted">{f.confidence} confidence</span>
+                    <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] text-muted">
+                      <span>{f.kickoff}</span>
+                      <span>Draw {f.probs.draw}% · {f.confidence} confidence</span>
                     </div>
                   </Link>
                 </li>

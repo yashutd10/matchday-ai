@@ -1,5 +1,8 @@
 import { getLeagueTable } from "@/lib/football";
 import { FavouriteRowMarker } from "@/components/favourite";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "League Table" };
 
 const formColor: Record<string, string> = { W: "bg-[#1f6b46]", D: "bg-[#3a4350]", L: "bg-[#8a2e2e]" };
 

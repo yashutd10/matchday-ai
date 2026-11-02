@@ -58,7 +58,7 @@ export default async function Home() {
             <YourTeamCard fixtures={fixtures} />
             <div className="flex items-center justify-between">
               <h2 className="font-display text-[22px] font-bold md:text-3xl">All fixtures</h2>
-              <span className="text-sm text-lime">{fixtures.length} matches</span>
+              <Link href="/fixtures" className="text-sm text-lime hover:underline">All gameweeks →</Link>
             </div>
             <ul className="grid gap-2.5 lg:grid-cols-2 lg:gap-3">
               {rest.map((f) => (

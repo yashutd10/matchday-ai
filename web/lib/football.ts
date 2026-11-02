@@ -229,6 +229,8 @@ export type Accuracy = {
   usedLastSeason: boolean;
   gameweeks: { number: number; total: number; v1: number; v2: number; v3: number }[];
   latest: { number: number; predictions: PastPrediction[] } | null;
+  /** The live model's pre-match prediction for every finished match, by match id. */
+  byMatch: Record<number, { predicted: [number, number]; probs: Fixture["probs"]; correct: boolean; exact: boolean }>;
 };
 
 /** Below this many backtested matches the evidence is too thin to switch models. */
@@ -249,7 +251,7 @@ export async function getAccuracy(): Promise<Accuracy | null> {
   const score = (): ModelScore => ({ correct: 0, exact: 0, brier: 0 });
   const acc: Accuracy = {
     total: 0, v1: score(), v2: score(), v3: score(), live: "v2", homeBaseline: 0,
-    usedLastSeason: prevTrain.length > 0, gameweeks: [], latest: null,
+    usedLastSeason: prevTrain.length > 0, gameweeks: [], latest: null, byMatch: {},
   };
 
   const perGw: { md: number; matches: ApiMatch[]; preds: Record<ModelKey, ReturnType<Predictor>[]> }[] = [];
@@ -285,6 +287,17 @@ export async function getAccuracy(): Promise<Accuracy | null> {
 
   if (acc.total) for (const k of ["v1", "v2", "v3"] as const) acc[k].brier /= acc.total;
   acc.live = acc.total >= MIN_MATCHES_TO_SWITCH && acc.v3.brier < acc.v2.brier ? "v3" : "v2";
+
+  for (const gw of perGw) {
+    gw.matches.forEach((m, i) => {
+      const p = gw.preds[acc.live][i];
+      const hg = m.score.fullTime.home!, ag = m.score.fullTime.away!;
+      acc.byMatch[m.id] = {
+        predicted: p.score, probs: p.probs,
+        correct: p.top === outcomeOf(hg, ag), exact: p.score[0] === hg && p.score[1] === ag,
+      };
+    });
+  }
 
   const last = perGw[perGw.length - 1];
   if (last) {
@@ -398,4 +411,81 @@ export async function getScorers(): Promise<Scorer[] | null> {
     console.error("Failed to load scorers", err);
     return null;
   }
+}
+
+/* ---------- full season fixtures and results ---------- */
+
+export type SeasonMatch = {
+  id: number;
+  home: { name: string; tla: string };
+  away: { name: string; tla: string };
+  date: string; // e.g. "Sat 25 Oct"
+  time: string; // e.g. "8:30 PM"
+  state: "finished" | "live" | "upcoming" | "postponed";
+  score: [number, number] | null;
+  prediction: { score: [number, number]; probs: Fixture["probs"]; correct?: boolean; exact?: boolean } | null;
+  /** True for next gameweek's matches, which have a full preview page. */
+  hasPreview: boolean;
+};
+
+export type SeasonGameweek = { number: number; state: "finished" | "current" | "upcoming"; matches: SeasonMatch[] };
+
+const fmtDay = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: IST, weekday: "short", day: "numeric", month: "short" }).format(new Date(iso)).replace(",", "");
+const fmtTime = (iso: string) =>
+  new Intl.DateTimeFormat("en-US", { timeZone: IST, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+
+/** Every gameweek this season: results with the model's pre-match call, live scores, and upcoming fixtures with predictions. */
+export async function getSeasonFixtures(): Promise<{ gameweeks: SeasonGameweek[]; current: number } | null> {
+  const hist = await getHistory();
+  if (!hist) return null;
+  const { current, prevTrain, promoted } = hist;
+  const acc = await getAccuracy();
+
+  const finished = current.filter(isFinished);
+  const nextMd = current.find(isUpcoming)?.matchday ?? 39;
+  const predictor = fitV2(
+    [...prevTrain, ...(acc?.live === "v3" ? toTrainRecent(finished, nextMd) : toTrain(finished, 1))],
+    promoted,
+  );
+
+  const byGw = new Map<number, SeasonMatch[]>();
+  for (const m of current) {
+    const live = m.status === "IN_PLAY" || m.status === "PAUSED";
+    const state: SeasonMatch["state"] = isFinished(m) ? "finished" : live ? "live" : isUpcoming(m) ? "upcoming" : "postponed";
+    let prediction: SeasonMatch["prediction"] = null;
+    if (state === "finished") {
+      const b = acc?.byMatch[m.id];
+      if (b) prediction = { score: b.predicted, probs: b.probs, correct: b.correct, exact: b.exact };
+    } else {
+      const p = predictor(m.homeTeam.id, m.awayTeam.id);
+      prediction = { score: p.score, probs: p.probs };
+    }
+    const list = byGw.get(m.matchday) ?? byGw.set(m.matchday, []).get(m.matchday)!;
+    list.push({
+      id: m.id,
+      home: { name: m.homeTeam.shortName, tla: m.homeTeam.tla },
+      away: { name: m.awayTeam.shortName, tla: m.awayTeam.tla },
+      date: fmtDay(m.utcDate),
+      time: fmtTime(m.utcDate),
+      state,
+      score: m.score.fullTime.home !== null && m.score.fullTime.away !== null ? [m.score.fullTime.home, m.score.fullTime.away] : null,
+      prediction,
+      hasPreview: m.matchday === nextMd && state === "upcoming",
+    });
+  }
+
+  const gameweeks = [...byGw.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([number, matches]) => ({
+      number,
+      matches,
+      state: (matches.every((x) => x.state === "finished" || x.state === "postponed")
+        ? "finished"
+        : matches.some((x) => x.state !== "upcoming")
+          ? "current"
+          : "upcoming") as SeasonGameweek["state"],
+    }));
+  const current_ = gameweeks.find((g) => g.state !== "finished")?.number ?? gameweeks[gameweeks.length - 1]?.number ?? 1;
+  return { gameweeks, current: current_ };
 }

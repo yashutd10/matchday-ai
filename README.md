@@ -1,5 +1,7 @@
 # Matchday AI
 
+**Live:** [matchday-ai-theta.vercel.app](https://matchday-ai-theta.vercel.app)
+
 AI-powered Premier League match previews and predictions, built for fans in India (kickoffs in IST).
 
 ## What it does
@@ -12,23 +14,25 @@ AI-powered Premier League match previews and predictions, built for fans in Indi
 
 ## The model
 
-A Poisson goals model with:
+A Poisson goals model, improved in three versions and scored on every match this season:
 
-- attack and defence strength from all of a team's matches plus a league-wide home advantage
-- last season's results as a prior (weighted 40%), with weaker starting ratings for promoted teams
-- shrinkage toward the league average for small samples
-- a Dixon–Coles correction for low-scoring draws
+- **v1:** home-only / away-only scoring rates.
+- **v2:** attack and defence strength from all of a team's matches plus a league-wide home advantage; last season's results as a prior (weighted 40%); weaker starting ratings for promoted teams; shrinkage toward the league average; a Dixon–Coles correction for low-scoring draws.
+- **v3:** v2 plus recency weighting: a result's weight halves every 5 gameweeks, so current form counts more.
 
-Backtest so far this season (gameweeks 2–8, 70 matches):
+The live site uses a **champion/challenger** setup: it automatically serves whichever of v2 and v3 has the better Brier score in the backtest (once at least 50 matches have been tested).
+
+Backtest so far this season (gameweeks 2–9, 79 matches), each gameweek predicted using only earlier results:
 
 | Model | Results right | Exact scores | Brier score |
 |---|---|---|---|
-| v2 (current) | 43% | 9% | 0.627 |
-| v1 (first version) | 34% | 3% | 0.760 |
-| Always back home | 34% | – | – |
+| **v3 (live)** | **46%** | **9%** | **0.619** |
+| v2 | 44% | 9% | 0.624 |
+| v1 | 38% | 4% | 0.734 |
+| Always back home | 37% | – | – |
 | Random guess | 33% | – | 0.667 |
 
-Changes were tested on 300 simulated seasons before going live; a "predict more draws" rule was tried and dropped because it lowered accuracy.
+Changes were tested on 300 simulated seasons before going live; a "predict more draws" rule was tried and dropped because it lowered accuracy. The live numbers update every gameweek on the [Accuracy page](https://matchday-ai-theta.vercel.app/accuracy).
 
 ## Tech
 

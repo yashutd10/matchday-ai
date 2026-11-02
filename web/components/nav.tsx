@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/", label: "Matches", d: "M3 4h18v17H3zM3 9h18M8 2v4M16 2v4" },
+  { href: "/fixtures", label: "Fixtures", d: "M4 6h16M4 12h16M4 18h10M18 16l2 2 3-4" },
   { href: "/table", label: "Table", d: "M3 5h18M3 12h18M3 19h18M8 5v14" },
   { href: "/stats", label: "Players", d: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" },
   { href: "/ask", label: "Ask AI", d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
@@ -37,8 +38,8 @@ export function TopBarView({ path }: { path: string }) {
           {items.map((item) => {
             const active = isActive(path, item.href);
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm transition ${active ? "bg-card font-semibold text-lime" : "text-muted hover:bg-card hover:text-ink"}`}>
-                <Icon d={item.d} size={18} />
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition xl:px-4 ${active ? "bg-card font-semibold text-lime" : "text-muted hover:bg-card hover:text-ink"}`}>
+                <span className="hidden xl:inline"><Icon d={item.d} size={18} /></span>
                 {item.label}
               </Link>
             );
@@ -64,7 +65,7 @@ export function BottomNav() {
 
 export function BottomNavView({ path }: { path: string }) {
   return (
-    <nav className="sticky bottom-0 z-10 grid grid-cols-5 border-t border-[#1e2632] bg-[#0e131a] px-2 pt-2 pb-5 text-[11px] lg:hidden">
+    <nav className="sticky bottom-0 z-10 grid grid-cols-6 border-t border-[#1e2632] bg-[#0e131a] px-2 pt-2 pb-5 text-[11px] lg:hidden">
       {items.map((item) => {
         const active = isActive(path, item.href);
         return (

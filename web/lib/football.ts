@@ -48,28 +48,48 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 /* ---------- data ---------- */
 
 /**
- * Premier League matches for a season (default: the current one), cached for an hour.
- * Null when there is no key, the API fails, or the free plan doesn't cover that season.
+ * football-data.org's free plan allows 10 requests a minute. When a build or a refresh fires several
+ * requests at once, it answers 429; wait for the counter to reset and try again rather than giving up.
  */
-export async function getSeasonMatches(season?: number): Promise<ApiMatch[] | null> {
+async function fetchFootballData(url: string, key: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url, { headers: { "X-Auth-Token": key } });
+    if (res.status !== 429) return res;
+    const wait = Math.min(Number(res.headers.get("X-RequestCounter-Reset")) || 15, 61);
+    console.warn(`football-data.org rate limit hit; retrying in ${wait}s`);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+  }
+  throw new Error("football-data.org kept rate-limiting; gave up after 3 tries");
+}
+
+/**
+ * The cached part. It throws on any failure, so a failed or rate-limited request is never saved:
+ * the next visit simply tries again, instead of serving "no data" for hours.
+ */
+async function loadSeason(season: number): Promise<ApiMatch[]> {
   "use cache";
   // Last season never changes, so refresh it daily; this season refreshes every 5 minutes.
   if (season) cacheLife("days");
   else cacheLife("matchday");
 
-  const key = process.env.FOOTBALL_DATA_KEY;
-  if (!key) return null;
+  const key = process.env.FOOTBALL_DATA_KEY!;
   const url = `https://api.football-data.org/v4/competitions/PL/matches${season ? `?season=${season}` : ""}`;
+  const res = await fetchFootballData(url, key);
+  if (!res.ok) throw new Error(`football-data.org responded ${res.status} for ${season ? `season ${season}` : "current season"}`);
+  const { matches } = (await res.json()) as { matches: ApiMatch[] };
+  return matches.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+}
+
+/**
+ * Premier League matches for a season (default: the current one).
+ * Null when there is no key, or the API can't be reached right now.
+ */
+export async function getSeasonMatches(season?: number): Promise<ApiMatch[] | null> {
+  if (!process.env.FOOTBALL_DATA_KEY) return null;
   try {
-    const res = await fetch(url, { headers: { "X-Auth-Token": key } });
-    if (!res.ok) {
-      console.error(`football-data.org responded ${res.status} for ${season ? `season ${season}` : "current season"}`);
-      return null;
-    }
-    const { matches } = (await res.json()) as { matches: ApiMatch[] };
-    return matches.sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+    return await loadSeason(season ?? 0);
   } catch (err) {
-    console.error("Failed to load fixtures", err);
+    console.error("Failed to load fixtures:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -382,35 +402,32 @@ type ApiScorer = {
   penalties?: number | null;
 };
 
-/** Top scorers this season (with assists), cached for an hour. Null when unavailable. */
-export async function getScorers(): Promise<Scorer[] | null> {
+async function loadScorers(): Promise<Scorer[]> {
   "use cache";
   cacheLife("hours");
+  const res = await fetchFootballData("https://api.football-data.org/v4/competitions/PL/scorers?limit=50", process.env.FOOTBALL_DATA_KEY!);
+  if (!res.ok) throw new Error(`football-data.org responded ${res.status} for scorers`);
+  const { scorers } = (await res.json()) as { scorers: ApiScorer[] };
+  return scorers.map((s) => ({
+    name: s.player.name,
+    position: s.player.section ?? s.player.position ?? null,
+    nationality: s.player.nationality ?? null,
+    team: s.team.shortName,
+    tla: s.team.tla,
+    played: s.playedMatches ?? 0,
+    goals: s.goals ?? 0,
+    assists: s.assists ?? 0,
+    penalties: s.penalties ?? 0,
+  }));
+}
 
-  const key = process.env.FOOTBALL_DATA_KEY;
-  if (!key) return null;
+/** Top scorers this season (with assists), cached for an hour. Null when unavailable; failures are never cached. */
+export async function getScorers(): Promise<Scorer[] | null> {
+  if (!process.env.FOOTBALL_DATA_KEY) return null;
   try {
-    const res = await fetch("https://api.football-data.org/v4/competitions/PL/scorers?limit=50", {
-      headers: { "X-Auth-Token": key },
-    });
-    if (!res.ok) {
-      console.error(`football-data.org responded ${res.status} for scorers`);
-      return null;
-    }
-    const { scorers } = (await res.json()) as { scorers: ApiScorer[] };
-    return scorers.map((s) => ({
-      name: s.player.name,
-      position: s.player.section ?? s.player.position ?? null,
-      nationality: s.player.nationality ?? null,
-      team: s.team.shortName,
-      tla: s.team.tla,
-      played: s.playedMatches ?? 0,
-      goals: s.goals ?? 0,
-      assists: s.assists ?? 0,
-      penalties: s.penalties ?? 0,
-    }));
+    return await loadScorers();
   } catch (err) {
-    console.error("Failed to load scorers", err);
+    console.error("Failed to load scorers:", err instanceof Error ? err.message : err);
     return null;
   }
 }

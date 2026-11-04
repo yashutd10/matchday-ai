@@ -96,11 +96,11 @@ async function Results({ searchParams }: { searchParams: SP }) {
       </p>
 
       {shown.length ? (
-        <div className="rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
+        <div className="overflow-clip rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
           <table className="w-full text-sm md:min-w-[860px]">
             <thead className="sticky top-16 z-20 bg-card shadow-[0_1px_0_#222b36] md:top-0">
               <tr className="text-left text-xs text-muted">
-                <th className="sticky left-0 z-10 bg-card py-3 pr-2 pl-4 font-normal">Player</th>
+                <th className="py-3 pr-2 pl-4 font-normal">Player</th>
                 <th className="py-3 pl-2 font-normal">Club</th>
                 <th className="hidden md:table-cell py-3 font-normal">Pos</th>
                 <th className="py-3 text-right font-normal">Price</th>
@@ -116,7 +116,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
             <tbody>
               {shown.map((p) => (
                 <tr key={p.id} className="border-t border-line">
-                  <td className="sticky left-0 z-[5] bg-card py-2.5 pr-2 pl-4">
+                  <td className="py-2.5 pr-2 pl-4">
                     <div className="flex items-center gap-2">
                       <StatusDot p={p} />
                       <Link href={playerHref(p.id)} className="font-semibold hover:text-lime hover:underline">{p.name}</Link>

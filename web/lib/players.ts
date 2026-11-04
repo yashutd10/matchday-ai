@@ -74,24 +74,25 @@ const TLA_ALIASES: Record<string, string> = { NFO: "NOT" };
 const num = (v: string | number | undefined | null) => (v == null ? 0 : Number(v) || 0);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Null when the FPL feed can't be reached; a failure is never cached, so the next visit retries. */
 export async function getPlayers(): Promise<Player[] | null> {
+  try {
+    return await loadPlayers();
+  } catch (err) {
+    console.error("Failed to load the FPL feed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function loadPlayers(): Promise<Player[]> {
   "use cache";
   cacheLife("hours");
 
-  let data: { elements: FplElement[]; teams: FplTeam[] };
-  try {
-    const res = await fetch("https://fantasy.premierleague.com/api/bootstrap-static/", {
-      headers: { "user-agent": "MatchdayAI/1.0 (portfolio project)" },
-    });
-    if (!res.ok) {
-      console.error(`FPL feed responded ${res.status}`);
-      return null;
-    }
-    data = await res.json();
-  } catch (err) {
-    console.error("Failed to load the FPL feed", err);
-    return null;
-  }
+  const res = await fetch("https://fantasy.premierleague.com/api/bootstrap-static/", {
+    headers: { "user-agent": "MatchdayAI/1.0 (portfolio project)" },
+  });
+  if (!res.ok) throw new Error(`FPL feed responded ${res.status}`);
+  const data = (await res.json()) as { elements: FplElement[]; teams: FplTeam[] };
 
   const teams = new Map(data.teams.map((t) => [t.id, t]));
   const base = data.elements

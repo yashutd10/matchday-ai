@@ -491,3 +491,198 @@ export async function getSeasonFixtures(): Promise<{ gameweeks: SeasonGameweek[]
   const current_ = gameweeks.find((g) => g.state !== "finished")?.number ?? gameweeks[gameweeks.length - 1]?.number ?? 1;
   return { gameweeks, current: current_ };
 }
+
+/* ---------- season simulation (predicted table) ---------- */
+
+/** The live model (v2 or v3, whichever won the backtest), fitted on every result so far. */
+async function getLivePredictor() {
+  const hist = await getHistory();
+  if (!hist) return null;
+  const acc = await getAccuracy();
+  const finished = hist.current.filter(isFinished);
+  const nextMd = hist.current.find(isUpcoming)?.matchday ?? 39;
+  const predictor = fitV2(
+    [...hist.prevTrain, ...(acc?.live === "v3" ? toTrainRecent(finished, nextMd) : toTrain(finished, 1))],
+    hist.promoted,
+  );
+  return { ...hist, acc, finished, nextMd, predictor };
+}
+
+export type SimTeam = {
+  id: number; name: string; tla: string;
+  played: number; points: number; gd: number; gf: number; position: number;
+  expPoints: number; expPosition: number;
+  title: number; top4: number; relegation: number; // percentages
+  dist: number[]; // % chance of finishing in each position, 1st first
+};
+export type Simulation = { runs: number; remaining: number; teams: SimTeam[] };
+
+const SIM_RUNS = 10000;
+
+/** Small fast seeded random generator, so results only change when real results change. */
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function samplePoisson(lambda: number, rand: () => number) {
+  const limit = Math.exp(-lambda);
+  let k = 0, p = 1;
+  do { k++; p *= rand(); } while (p > limit);
+  return k - 1;
+}
+
+/** Plays out every remaining match SIM_RUNS times using the live model's expected goals. */
+export async function getSimulation(): Promise<Simulation | null> {
+  "use cache";
+  cacheLife("matchday");
+
+  const live = await getLivePredictor();
+  if (!live) return null;
+  const { current, finished, predictor } = live;
+
+  const teams = new Map<number, ApiTeam>();
+  for (const m of current) { teams.set(m.homeTeam.id, m.homeTeam); teams.set(m.awayTeam.id, m.awayTeam); }
+  const ids = [...teams.keys()];
+  const n = ids.length;
+  const ix = new Map(ids.map((id, i) => [id, i]));
+
+  const pts = new Array(n).fill(0), gd = new Array(n).fill(0), gf = new Array(n).fill(0), played = new Array(n).fill(0);
+  for (const m of finished) {
+    const h = ix.get(m.homeTeam.id)!, a = ix.get(m.awayTeam.id)!;
+    const hg = m.score.fullTime.home!, ag = m.score.fullTime.away!;
+    played[h]++; played[a]++;
+    gf[h] += hg; gf[a] += ag; gd[h] += hg - ag; gd[a] += ag - hg;
+    if (hg > ag) pts[h] += 3; else if (hg < ag) pts[a] += 3; else { pts[h]++; pts[a]++; }
+  }
+
+  const remaining = current
+    .filter((m) => !isFinished(m))
+    .map((m) => {
+      const p = predictor(m.homeTeam.id, m.awayTeam.id);
+      return { h: ix.get(m.homeTeam.id)!, a: ix.get(m.awayTeam.id)!, lh: p.lamH, la: p.lamA };
+    });
+
+  const rank = (P: number[], GD: number[], GF: number[], tieBreak: number[]) =>
+    ids.map((_, i) => i).sort((x, y) => P[y] - P[x] || GD[y] - GD[x] || GF[y] - GF[x] || tieBreak[y] - tieBreak[x]);
+
+  const rand = mulberry32(20261104 + finished.length);
+  const dist = Array.from({ length: n }, () => new Array(n).fill(0));
+  const sumPts = new Array(n).fill(0);
+  for (let run = 0; run < SIM_RUNS; run++) {
+    const P = pts.slice(), GD = gd.slice(), GF = gf.slice();
+    for (const r of remaining) {
+      const hg = samplePoisson(r.lh, rand), ag = samplePoisson(r.la, rand);
+      GF[r.h] += hg; GF[r.a] += ag; GD[r.h] += hg - ag; GD[r.a] += ag - hg;
+      if (hg > ag) P[r.h] += 3; else if (hg < ag) P[r.a] += 3; else { P[r.h]++; P[r.a]++; }
+    }
+    const order = rank(P, GD, GF, ids.map(() => rand()));
+    order.forEach((t, pos) => { dist[t][pos]++; });
+    for (let t = 0; t < n; t++) sumPts[t] += P[t];
+  }
+
+  const now = rank(pts, gd, gf, ids.map(() => 0));
+  const pct = (x: number) => Math.round((x / SIM_RUNS) * 1000) / 10;
+  const out: SimTeam[] = ids.map((id, t) => {
+    const team = teams.get(id)!;
+    const d = dist[t];
+    return {
+      id, name: team.shortName, tla: team.tla,
+      played: played[t], points: pts[t], gd: gd[t], gf: gf[t], position: now.indexOf(t) + 1,
+      expPoints: Math.round(sumPts[t] / SIM_RUNS),
+      expPosition: d.reduce((s, c, pos) => s + c * (pos + 1), 0) / SIM_RUNS,
+      title: pct(d[0]),
+      top4: pct(d.slice(0, 4).reduce((s, c) => s + c, 0)),
+      relegation: pct(d.slice(n - 3).reduce((s, c) => s + c, 0)),
+      dist: d.map(pct),
+    };
+  });
+  out.sort((x, y) => x.expPosition - y.expPosition);
+  return { runs: SIM_RUNS, remaining: remaining.length, teams: out };
+}
+
+/* ---------- team pages ---------- */
+
+export type TeamResult = {
+  id: number; date: string; opponent: string; opponentTla: string; home: boolean;
+  gf: number; ga: number; result: Form; ai: { correct: boolean; exact: boolean } | null;
+};
+export type TeamFixture = {
+  id: number; date: string; time: string; opponent: string; opponentTla: string; home: boolean;
+  win: number; draw: number; loss: number; predicted: [number, number]; hasPreview: boolean;
+};
+export type TeamPage = {
+  name: string; tla: string; position: number | null; row: TableRow | null;
+  sim: SimTeam | null; teamsCount: number;
+  results: TeamResult[]; upcoming: TeamFixture[];
+  league: { gfPerGame: number; gaPerGame: number; ppg: number };
+  scorers: Scorer[];
+};
+
+/** Every team's three-letter code, for building the team pages. */
+export async function getTeamCodes(): Promise<string[]> {
+  const matches = await getSeasonMatches();
+  if (!matches) return [];
+  return [...new Set(matches.flatMap((m) => [m.homeTeam.tla, m.awayTeam.tla]))];
+}
+
+export async function getTeamPage(code: string): Promise<TeamPage | null | undefined> {
+  const live = await getLivePredictor();
+  if (!live) return null;
+  const { current, predictor, acc, nextMd } = live;
+  const tla = code.toUpperCase();
+  const team = current.flatMap((m) => [m.homeTeam, m.awayTeam]).find((t) => t.tla === tla);
+  if (!team) return undefined;
+
+  const [table, sim, scorers] = await Promise.all([getLeagueTable(), getSimulation(), getScorers()]);
+  const rowIdx = table?.findIndex((r) => r.tla === tla) ?? -1;
+  const mine = current.filter((m) => m.homeTeam.id === team.id || m.awayTeam.id === team.id);
+
+  const results: TeamResult[] = mine
+    .filter(isFinished)
+    .reverse()
+    .map((m) => {
+      const home = m.homeTeam.id === team.id;
+      const opp = home ? m.awayTeam : m.homeTeam;
+      const gf = home ? m.score.fullTime.home! : m.score.fullTime.away!;
+      const ga = home ? m.score.fullTime.away! : m.score.fullTime.home!;
+      const b = acc?.byMatch[m.id];
+      return {
+        id: m.id, date: fmtDay(m.utcDate), opponent: opp.shortName, opponentTla: opp.tla, home, gf, ga,
+        result: gf > ga ? "W" : gf < ga ? "L" : "D",
+        ai: b ? { correct: b.correct, exact: b.exact } : null,
+      };
+    });
+
+  const upcoming: TeamFixture[] = mine
+    .filter(isUpcoming)
+    .slice(0, 3)
+    .map((m) => {
+      const home = m.homeTeam.id === team.id;
+      const opp = home ? m.awayTeam : m.homeTeam;
+      const p = predictor(m.homeTeam.id, m.awayTeam.id);
+      return {
+        id: m.id, date: fmtDay(m.utcDate), time: fmtTime(m.utcDate), opponent: opp.shortName, opponentTla: opp.tla, home,
+        win: home ? p.probs.home : p.probs.away, draw: p.probs.draw, loss: home ? p.probs.away : p.probs.home,
+        predicted: home ? p.score : [p.score[1], p.score[0]],
+        hasPreview: m.matchday === nextMd,
+      };
+    });
+
+  const games = table?.reduce((s, r) => s + r.played, 0) ?? 0;
+  const league = {
+    gfPerGame: games ? round1(table!.reduce((s, r) => s + r.gf, 0) / games) : 0,
+    gaPerGame: games ? round1(table!.reduce((s, r) => s + r.ga, 0) / games) : 0,
+    ppg: games ? round1(table!.reduce((s, r) => s + r.points, 0) / games) : 0,
+  };
+
+  return {
+    name: team.shortName, tla, position: rowIdx >= 0 ? rowIdx + 1 : null, row: rowIdx >= 0 ? table![rowIdx] : null,
+    sim: sim?.teams.find((t) => t.id === team.id) ?? null, teamsCount: sim?.teams.length ?? 20,
+    results, upcoming, league,
+    scorers: (scorers ?? []).filter((s) => s.tla === tla).slice(0, 3),
+  };
+}

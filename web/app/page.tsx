@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { teamHref } from "@/components/table-tabs";
 import { getMatchday } from "@/lib/football";
 import { Crest, ProbBar } from "@/components/ui";
 import { AskBox, Icon } from "@/components/nav";
@@ -32,7 +33,7 @@ export default async function Home() {
               <div className="flex items-center justify-between">
                 <div className="flex w-24 shrink-0 flex-col items-center gap-2 lg:w-28">
                   <Crest team={pick.home} size="lg" />
-                  <span className="text-center text-sm font-semibold md:text-base">{pick.home.name}</span>
+                  <Link href={teamHref(pick.home.short)} className="text-center text-sm font-semibold hover:text-lime hover:underline md:text-base">{pick.home.name}</Link>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="text-[11px] tracking-wider text-muted">PREDICTED</span>
@@ -40,7 +41,7 @@ export default async function Home() {
                 </div>
                 <div className="flex w-24 shrink-0 flex-col items-center gap-2 lg:w-28">
                   <Crest team={pick.away} size="lg" />
-                  <span className="text-center text-sm font-semibold md:text-base">{pick.away.name}</span>
+                  <Link href={teamHref(pick.away.short)} className="text-center text-sm font-semibold hover:text-lime hover:underline md:text-base">{pick.away.name}</Link>
                 </div>
               </div>
               <ProbBar probs={pick.probs} labels={["Home", "Away"]} />

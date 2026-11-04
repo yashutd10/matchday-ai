@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { teamHref } from "@/components/table-tabs";
 import { notFound } from "next/navigation";
 import { getFixture, getMatchday } from "@/lib/football";
 import { Crest, FormRow, ProbBar, StatBar } from "@/components/ui";
@@ -49,7 +50,7 @@ async function MatchPreview({ params }: { params: Params }) {
       <section className="mx-auto flex w-full max-w-2xl items-center justify-between px-2">
         <div className="flex w-24 flex-col items-center gap-2">
           <Crest team={f.home} size="lg" ring="#4c8dff" />
-          <span className="text-sm font-semibold">{f.home.name}</span>
+          <Link href={teamHref(f.home.short)} className="text-sm font-semibold hover:text-lime hover:underline">{f.home.name}</Link>
         </div>
         <div className="flex flex-col items-center gap-1">
           <span className="text-[11px] tracking-wider text-muted">AI PREDICTION</span>
@@ -58,7 +59,7 @@ async function MatchPreview({ params }: { params: Params }) {
         </div>
         <div className="flex w-24 flex-col items-center gap-2">
           <Crest team={f.away} size="lg" ring="#ff9a52" />
-          <span className="text-sm font-semibold">{f.away.name}</span>
+          <Link href={teamHref(f.away.short)} className="text-sm font-semibold hover:text-lime hover:underline">{f.away.name}</Link>
         </div>
       </section>
 

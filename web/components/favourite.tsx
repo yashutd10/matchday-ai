@@ -86,3 +86,18 @@ export function FavouriteRowMarker({ tla }: { tla: string }) {
   if (fav !== tla) return null;
   return <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold tracking-wider text-pitch">YOUR TEAM</span>;
 }
+
+export function FavouriteToggle({ tla }: { tla: string }) {
+  const fav = useFavourite();
+  const on = fav === tla;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => setFavourite(on ? "" : tla)}
+      className={`flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition ${on ? "border-lime bg-lime text-pitch" : "border-line bg-card text-soft hover:text-ink"}`}
+    >
+      {on ? "★ Your team" : "☆ Make my team"}
+    </button>
+  );
+}

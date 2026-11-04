@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
   },
+  // Lets phones and laptops on the home Wi-Fi use the dev server (development only).
+  allowedDevOrigins: ["192.168.*.*"],
   cacheComponents: true,
   cacheLife: {
     // Scores, fixtures and the table: refresh in the background every 5 minutes.

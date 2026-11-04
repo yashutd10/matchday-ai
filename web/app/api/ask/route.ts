@@ -3,6 +3,7 @@ import { getLeagueTable, getMatchday, getScorers } from "@/lib/football";
 type Msg = { role: "user" | "assistant"; content: string };
 
 const MODEL = "claude-haiku-5-5";
+const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 async function buildContext() {
   const [table, md, scorers] = await Promise.all([getLeagueTable(), getMatchday(), getScorers()]);
@@ -27,10 +28,11 @@ async function buildContext() {
 }
 
 export async function POST(req: Request) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) {
+  const gemini = process.env.GEMINI_API_KEY;
+  const anthropic = process.env.ANTHROPIC_API_KEY;
+  if (!gemini && !anthropic) {
     return Response.json(
-      { error: "The AI analyst isn't connected yet. Add ANTHROPIC_API_KEY to .env.local and restart the server." },
+      { error: "The AI analyst isn't connected yet. Add GEMINI_API_KEY (free) or ANTHROPIC_API_KEY to .env.local and restart the server." },
       { status: 503 },
     );
   }
@@ -58,24 +60,52 @@ DATA
 ${await buildContext()}`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 600, system, messages }),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      console.error("Anthropic API error", res.status, detail.slice(0, 300));
-      const msg = res.status === 401 ? "Your Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .env.local."
-        : res.status === 429 ? "Too many questions at once. Try again in a moment."
-        : "The AI analyst couldn't answer right now. Try again.";
-      return Response.json({ error: msg }, { status: 502 });
-    }
-    const data = (await res.json()) as { content: { type: string; text?: string }[] };
-    const answer = data.content.filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+    const answer = gemini ? await askGemini(gemini, system, messages) : await askClaude(anthropic!, system, messages);
     return Response.json({ answer });
   } catch (err) {
+    if (err instanceof AskError) return Response.json({ error: err.message }, { status: 502 });
     console.error("Ask AI failed", err);
     return Response.json({ error: "Couldn't reach the AI service. Check your internet connection." }, { status: 502 });
   }
+}
+
+class AskError extends Error {}
+
+function friendlyError(provider: string, envVar: string, status: number, detail: string) {
+  console.error(`${provider} API error`, status, detail.slice(0, 300));
+  if (status === 400 && /model/i.test(detail)) return new AskError(`The ${provider} model name wasn't recognised. Check the model setting in .env.local.`);
+  if (status === 401 || status === 403 || /API key not valid/i.test(detail)) return new AskError(`Your ${provider} API key was rejected. Check ${envVar} in .env.local.`);
+  if (status === 429) return new AskError("The AI's free limit is used up for now. Try again in a minute, or tomorrow if the daily limit is reached.");
+  return new AskError("The AI analyst couldn't answer right now. Try again.");
+}
+
+/** Google Gemini (has a free tier). Model can be changed with GEMINI_MODEL. */
+async function askGemini(key: string, system: string, messages: Msg[]) {
+  const model = process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": key, "content-type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+      generationConfig: { maxOutputTokens: 800, temperature: 0.4 },
+    }),
+  });
+  if (!res.ok) throw friendlyError("Gemini", "GEMINI_API_KEY", res.status, await res.text());
+  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const answer = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
+  if (!answer) throw new AskError("The AI didn't return an answer. Try rephrasing your question.");
+  return answer;
+}
+
+/** Anthropic Claude (paid API). */
+async function askClaude(key: string, system: string, messages: Msg[]) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: MODEL, max_tokens: 600, system, messages }),
+  });
+  if (!res.ok) throw friendlyError("Anthropic", "ANTHROPIC_API_KEY", res.status, await res.text());
+  const data = (await res.json()) as { content: { type: string; text?: string }[] };
+  return data.content.filter((c) => c.type === "text").map((c) => c.text).join("").trim();
 }

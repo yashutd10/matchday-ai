@@ -134,7 +134,10 @@ export function TeamView({ t }: { t: TeamPage }) {
               ))}
             </ul>
           ) : <p className="text-sm text-muted">No players in the league&apos;s top-50 scorers yet.</p>}
-          <Link href="/stats" className="text-sm text-lime hover:underline">All player stats →</Link>
+          <div className="flex flex-wrap gap-4">
+            <Link href={`/scouting?club=${t.tla}`} className="text-sm text-lime hover:underline">Full squad stats →</Link>
+            <Link href={`/scouting/team/${t.tla.toLowerCase()}`} className="text-sm text-lime hover:underline">Recruitment needs →</Link>
+          </div>
         </section>
       </div>
 

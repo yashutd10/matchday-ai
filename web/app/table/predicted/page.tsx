@@ -11,10 +11,10 @@ function Odds({ value, tone }: { value: number; tone: string }) {
   const label = value === 0 ? "–" : value < 1 ? "<1%" : value > 99 && value < 100 ? ">99%" : `${Math.round(value)}%`;
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-[#1e2632]">
+      <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-[#1e2632] md:block">
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
-      <span className={`w-10 text-xs ${value === 0 ? "text-muted" : "font-semibold"}`}>{label}</span>
+      <span className={`w-9 text-xs md:w-10 ${value === 0 ? "text-muted" : "font-semibold"}`}>{label}</span>
     </div>
   );
 }
@@ -27,17 +27,17 @@ async function Data() {
       {!sim ? (
         <p className="text-soft">The predicted table needs live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
       ) : (
-        <div className="max-h-[calc(100dvh-11rem)] overflow-auto overscroll-contain rounded-[18px] border border-line bg-card">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_#222b36]">
+        <div className="rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
+          <table className="w-full text-sm md:min-w-[760px]">
+            <thead className="sticky top-16 z-20 bg-card shadow-[0_1px_0_#222b36] md:top-0">
               <tr className="text-left text-xs text-muted">
                 <th className="sticky left-0 z-10 bg-card py-3 pr-2 pl-4 font-normal">#</th>
                 <th className="sticky left-10 z-10 bg-card py-3 font-normal">Team</th>
-                <th className="py-3 text-center font-normal">Pts now</th>
-                <th className="py-3 text-center font-normal">Predicted pts</th>
-                <th className="py-3 font-normal">Win the league</th>
+                <th className="hidden sm:table-cell py-3 text-center font-normal">Pts now</th>
+                <th className="py-3 text-center font-normal"><span className="md:hidden">Pts</span><span className="hidden md:inline">Predicted pts</span></th>
+                <th className="py-3 font-normal"><span className="md:hidden">Title</span><span className="hidden md:inline">Win the league</span></th>
                 <th className="py-3 font-normal">Top 4</th>
-                <th className="pr-4 py-3 font-normal">Relegated</th>
+                <th className="pr-4 py-3 font-normal"><span className="md:hidden">Down</span><span className="hidden md:inline">Relegated</span></th>
               </tr>
             </thead>
             <tbody>
@@ -47,7 +47,7 @@ async function Data() {
                 return (
                   <tr key={t.tla} className="border-t border-line">
                     <td className={`sticky left-0 z-[5] w-10 border-l-4 bg-card py-3 pr-2 pl-3 font-semibold text-muted ${zone}`}>{i + 1}</td>
-                    <td className="sticky left-10 z-[5] bg-card py-3 pr-3">
+                    <td className="sticky left-10 z-[5] max-w-[40vw] bg-card py-3 pr-3 md:max-w-none">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1e2632] font-display text-xs font-bold">{t.tla}</span>
                         <Link href={teamHref(t.tla)} className="font-semibold hover:text-lime hover:underline">{t.name}</Link>
@@ -59,7 +59,7 @@ async function Data() {
                         <FavouriteRowMarker tla={t.tla} />
                       </div>
                     </td>
-                    <td className="py-3 text-center text-soft">{t.points}</td>
+                    <td className="hidden sm:table-cell py-3 text-center text-soft">{t.points}</td>
                     <td className="py-3 text-center font-display text-lg font-bold">{t.expPoints}</td>
                     <td className="py-3"><Odds value={t.title} tone="bg-lime" /></td>
                     <td className="py-3"><Odds value={t.top4} tone="bg-home" /></td>

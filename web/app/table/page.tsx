@@ -17,20 +17,20 @@ async function Data() {
       {!table ? (
         <p className="text-soft">The table needs live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
       ) : (
-        <div className="max-h-[calc(100dvh-11rem)] overflow-auto overscroll-contain rounded-[18px] border border-line bg-card">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_#222b36]">
+        <div className="rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
+          <table className="w-full text-sm md:min-w-[720px]">
+            <thead className="sticky top-16 z-20 bg-card shadow-[0_1px_0_#222b36] md:top-0">
               <tr className="text-left text-xs text-muted">
                 <th className="sticky left-0 z-10 bg-card py-3 pr-2 pl-4 font-normal">#</th>
                 <th className="sticky left-10 z-10 bg-card py-3 font-normal">Team</th>
                 <th className="py-3 text-center font-normal">P</th>
-                <th className="py-3 text-center font-normal">W</th>
-                <th className="py-3 text-center font-normal">D</th>
-                <th className="py-3 text-center font-normal">L</th>
+                <th className="hidden sm:table-cell py-3 text-center font-normal">W</th>
+                <th className="hidden sm:table-cell py-3 text-center font-normal">D</th>
+                <th className="hidden sm:table-cell py-3 text-center font-normal">L</th>
                 <th className="py-3 text-center font-normal">GD</th>
                 <th className="py-3 text-center font-normal">Pts</th>
-                <th className="py-3 font-normal">Form</th>
-                <th className="py-3 pr-4 font-normal">Home / Away pts</th>
+                <th className="hidden md:table-cell py-3 font-normal">Form</th>
+                <th className="hidden lg:table-cell py-3 pr-4 font-normal">Home / Away pts</th>
               </tr>
             </thead>
             <tbody>
@@ -41,7 +41,7 @@ async function Data() {
                 return (
                   <tr key={r.tla} className="border-t border-line">
                     <td className={`sticky left-0 z-[5] w-10 border-l-4 bg-card py-3 pr-2 pl-3 font-semibold text-muted ${zone}`}>{i + 1}</td>
-                    <td className="sticky left-10 z-[5] bg-card py-3 pr-3">
+                    <td className="sticky left-10 z-[5] max-w-[46vw] bg-card py-3 pr-3 md:max-w-none">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1e2632] font-display text-xs font-bold">{r.tla}</span>
                         <Link href={teamHref(r.tla)} className="font-semibold hover:text-lime hover:underline">{r.team}</Link>
@@ -49,19 +49,19 @@ async function Data() {
                       </div>
                     </td>
                     <td className="py-3 text-center text-soft">{r.played}</td>
-                    <td className="py-3 text-center text-soft">{r.won}</td>
-                    <td className="py-3 text-center text-soft">{r.drawn}</td>
-                    <td className="py-3 text-center text-soft">{r.lost}</td>
+                    <td className="hidden sm:table-cell py-3 text-center text-soft">{r.won}</td>
+                    <td className="hidden sm:table-cell py-3 text-center text-soft">{r.drawn}</td>
+                    <td className="hidden sm:table-cell py-3 text-center text-soft">{r.lost}</td>
                     <td className="py-3 text-center text-soft">{gd > 0 ? `+${gd}` : gd}</td>
                     <td className="py-3 text-center font-display text-lg font-bold">{r.points}</td>
-                    <td className="py-3">
+                    <td className="hidden py-3 md:table-cell">
                       <div className="flex gap-1">
                         {r.form.split("").map((f, j) => (
                           <span key={j} className={`${formColor[f]} flex h-6 w-6 items-center justify-center rounded text-[11px] font-semibold`}>{f}</span>
                         ))}
                       </div>
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="hidden py-3 pr-4 lg:table-cell">
                       <div className="flex w-40 flex-col gap-1" aria-label={`${r.homePts} points at home, ${r.awayPts} away`}>
                         <div className="flex items-center gap-2"><div className="h-1.5 rounded-full bg-home" style={{ width: `${(r.homePts / maxPts) * 100}%` }} /><span className="text-[11px] text-soft">{r.homePts}</span></div>
                         <div className="flex items-center gap-2"><div className="h-1.5 rounded-full bg-away" style={{ width: `${(r.awayPts / maxPts) * 100}%` }} /><span className="text-[11px] text-soft">{r.awayPts}</span></div>

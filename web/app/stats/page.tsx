@@ -1,4 +1,5 @@
 import { getScorers, type Scorer } from "@/lib/football";
+import { PlayersTabs } from "@/components/players-ui";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Player Stats" };
@@ -36,6 +37,7 @@ export default async function StatsPage() {
     return (
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-5 pt-8 pb-10 md:px-8 md:pt-12">
         <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Player Stats</h1>
+        <PlayersTabs active="leaders" />
         <p className="text-soft">Player stats need live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
       </main>
     );
@@ -53,6 +55,7 @@ export default async function StatsPage() {
         <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Player Stats</h1>
         <p className="text-sm text-soft md:text-base">This season&apos;s top goalscorers and creators in the Premier League.</p>
       </div>
+      <PlayersTabs active="leaders" />
 
       {leader && (
         <section className="flex flex-col gap-4 rounded-[20px] border border-lime/40 bg-lime/5 p-5 md:flex-row md:items-center md:justify-between md:p-6">

@@ -19,7 +19,7 @@ export const Icon = ({ d, size = 20 }: { d: string; size?: number }) => (
 );
 
 const isActive = (path: string, href: string) =>
-  href === "/" ? path === "/" || path.startsWith("/match") : href === "/table" ? path.startsWith("/table") || path.startsWith("/team") : path.startsWith(href);
+  href === "/" ? path === "/" || path.startsWith("/match") : href === "/table" ? path.startsWith("/table") || path.startsWith("/team") : href === "/stats" ? path.startsWith("/stats") || path.startsWith("/scouting") : path.startsWith(href);
 
 export function TopBar() {
   return <TopBarView path={usePathname()} />;

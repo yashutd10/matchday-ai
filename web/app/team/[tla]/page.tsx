@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -20,7 +21,7 @@ async function Team({ params }: { params: Params }) {
   const { tla } = await params;
   const data = await getTeamPage(tla);
   if (data === undefined) notFound();
-  if (data === null) return <p className="text-soft">Team pages need live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>;
+  if (data === null) return <LiveDataError what="Team pages" />;
   return <TeamView t={data} />;
 }
 

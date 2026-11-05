@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import { Suspense } from "react";
 import { getLeagueTable } from "@/lib/football";
 import Link from "next/link";
@@ -15,7 +16,7 @@ async function Data() {
     <>
 
       {!table ? (
-        <p className="text-soft">The table needs live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
+        <LiveDataError what="Table standings" />
       ) : (
         <div className="overflow-clip rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
           <table className="w-full text-sm md:min-w-[720px]">

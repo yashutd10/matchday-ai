@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import { getAccuracy } from "@/lib/football";
 import type { Metadata } from "next";
 
@@ -12,7 +13,7 @@ export default async function AccuracyPage() {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-5 pt-8 pb-10 md:px-8 md:pt-12">
         <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Accuracy</h1>
-        <p className="text-soft">Accuracy needs live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
+        <LiveDataError what="Accuracy figures" />
       </main>
     );
   }

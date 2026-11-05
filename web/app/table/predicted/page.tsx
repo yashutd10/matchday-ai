@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -25,7 +26,7 @@ async function Data() {
     <>
 
       {!sim ? (
-        <p className="text-soft">The predicted table needs live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
+        <LiveDataError what="Predicted table odds" />
       ) : (
         <div className="overflow-clip rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
           <table className="w-full text-sm md:min-w-[760px]">

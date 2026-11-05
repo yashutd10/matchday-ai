@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import { getScorers, type Scorer } from "@/lib/football";
 import { PlayersTabs } from "@/components/players-ui";
 import type { Metadata } from "next";
@@ -38,7 +39,7 @@ export default async function StatsPage() {
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-5 pt-8 pb-10 md:px-8 md:pt-12">
         <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Player Stats</h1>
         <PlayersTabs active="leaders" />
-        <p className="text-soft">Player stats need live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>
+        <LiveDataError what="Player stats" />
       </main>
     );
   }

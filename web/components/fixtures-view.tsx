@@ -1,3 +1,4 @@
+import { LiveDataError } from "@/components/live-data-error";
 import Link from "next/link";
 import { getSeasonFixtures, type SeasonGameweek, type SeasonMatch } from "@/lib/football";
 import { Icon } from "@/components/nav";
@@ -170,7 +171,7 @@ export function FixturesShell({ children }: { children: React.ReactNode }) {
 
 export async function FixturesFor({ gw }: { gw?: number }) {
   const data = await getSeasonFixtures();
-  if (!data) return <p className="text-soft">Fixtures need live data. Add your football-data.org key to <code className="text-lime">.env.local</code> and restart the server.</p>;
+  if (!data) return <LiveDataError what="Fixtures" />;
   const week = data.gameweeks.find((g) => g.number === (gw ?? data.current));
   if (!week) return <p className="text-soft">There&apos;s no gameweek {gw} this season.</p>;
   return <FixturesView weeks={data.gameweeks.map(({ number, state }) => ({ number, state }))} week={week} current={data.current} />;

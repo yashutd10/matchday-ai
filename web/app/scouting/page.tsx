@@ -4,22 +4,29 @@ import type { Metadata } from "next";
 import { clubList, getPlayers, MIN_MINUTES, POSITIONS, POS_LABEL, type Player, type Pos } from "@/lib/players";
 import { money, NeedsData, playerHref, PlayersHeader, ScoreBar, StatusDot } from "@/components/players-ui";
 import { teamHref } from "@/components/table-tabs";
+import { PlayerSearch } from "@/components/player-search";
+import { fold } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Scouting" };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
+/**
+ * `short`/`show`: the column that explains the order. `col`: the desktop column that already
+ * shows this stat (it gets highlighted instead of duplicated). Score and price are always visible.
+ */
+type Sort = { label: string; get: (p: Player) => number; short?: string; show?: (p: Player) => string; col?: string };
 const SORTS = {
   score: { label: "Scout score", get: (p: Player) => p.score },
-  xg: { label: "xG per 90", get: (p: Player) => p.p90.xg },
-  xa: { label: "xA per 90", get: (p: Player) => p.p90.xa },
-  gi: { label: "Goals + assists per 90", get: (p: Player) => p.p90.gi },
-  goals: { label: "Goals", get: (p: Player) => p.goals },
-  assists: { label: "Assists", get: (p: Player) => p.assists },
-  defcon: { label: "Defensive actions per 90", get: (p: Player) => p.p90.defcon },
-  value: { label: "Score per £m (value)", get: (p: Player) => p.score / Math.max(p.price, 3.5) },
+  xg: { label: "xG per 90", get: (p: Player) => p.p90.xg, short: "xG/90", show: (p: Player) => p.p90.xg.toFixed(2), col: "xg" },
+  xa: { label: "xA per 90", get: (p: Player) => p.p90.xa, short: "xA/90", show: (p: Player) => p.p90.xa.toFixed(2), col: "xa" },
+  gi: { label: "Goals + assists per 90", get: (p: Player) => p.p90.gi, short: "G+A/90", show: (p: Player) => p.p90.gi.toFixed(2) },
+  goals: { label: "Goals", get: (p: Player) => p.goals, short: "Goals", show: (p: Player) => String(p.goals), col: "g" },
+  assists: { label: "Assists", get: (p: Player) => p.assists, short: "Assists", show: (p: Player) => String(p.assists), col: "a" },
+  defcon: { label: "Defensive actions per 90", get: (p: Player) => p.p90.defcon, short: "Def/90", show: (p: Player) => p.p90.defcon.toFixed(1), col: "def" },
+  value: { label: "Score per £m (value)", get: (p: Player) => p.score / Math.max(p.price, 3.5), short: "Pts/£m", show: (p: Player) => (p.score / Math.max(p.price, 3.5)).toFixed(1) },
   cheapest: { label: "Cheapest first", get: (p: Player) => -p.price },
-} as const;
+} satisfies Record<string, Sort>;
 type SortKey = keyof typeof SORTS;
 
 const PRICES = [["", "Any price"], ["5", "Up to £5m"], ["6", "Up to £6m"], ["7", "Up to £7m"], ["8", "Up to £8m"], ["10", "Up to £10m"], ["12", "Up to £12m"]] as const;
@@ -39,15 +46,22 @@ async function Results({ searchParams }: { searchParams: SP }) {
   const minMins = Number(one(sp.mins)) || MIN_MINUTES;
   const fit = one(sp.fit) === "1";
   const sort: SortKey = one(sp.sort) in SORTS ? (one(sp.sort) as SortKey) : "score";
-  const q = one(sp.q).trim().toLowerCase();
+  const q = fold(one(sp.q).trim());
   const clubs = clubList(players);
 
   const list = players
     .filter((p) => (!pos || p.pos === pos) && (!club || p.tla === club) && (!maxPrice || p.price <= maxPrice) && p.minutes >= minMins)
     .filter((p) => !fit || p.status === "available")
-    .filter((p) => !q || p.name.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q))
+    .filter((p) => !q || fold(p.name).includes(q) || fold(p.fullName).includes(q))
     .sort((a, b) => SORTS[sort].get(b) - SORTS[sort].get(a) || b.minutes - a.minutes);
   const shown = list.slice(0, 50);
+  const S: Sort = SORTS[sort];
+  // Extra column for the sorted stat: everywhere if no desktop column has it, phones only if one does.
+  const extra = S.show ? (S.col ? "md:hidden" : "") : null;
+  const hl = (col: string) => (S.col === col ? "font-semibold text-lime" : "");
+  const suggestions = players
+    .filter((p) => p.minutes > 0)
+    .map((p) => ({ id: p.id, name: p.name, fullName: p.fullName, tla: p.tla, pos: p.pos, price: p.price }));
 
   return (
     <>
@@ -75,7 +89,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted sm:col-span-2">Name
-          <input name="q" defaultValue={one(sp.q)} placeholder="Saka" className={`${select} placeholder:text-[#8a94a3]`} />
+          <PlayerSearch players={suggestions} defaultValue={one(sp.q)} className={`${select} placeholder:text-[#8a94a3]`} />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">Sort by
           <select name="sort" defaultValue={sort} className={select}>
@@ -101,16 +115,17 @@ async function Results({ searchParams }: { searchParams: SP }) {
             <thead className="sticky top-16 z-20 bg-card shadow-[0_1px_0_#222b36] md:top-0">
               <tr className="text-left text-xs text-muted">
                 <th className="py-3 pr-2 pl-4 font-normal">Player</th>
-                <th className="py-3 pl-2 font-normal">Club</th>
+                <th className="hidden sm:table-cell py-3 pl-2 font-normal">Club</th>
                 <th className="hidden md:table-cell py-3 font-normal">Pos</th>
-                <th className="py-3 text-right font-normal">Price</th>
+                <th className={`py-3 text-right font-normal ${sort === "cheapest" ? "font-semibold text-lime" : ""}`}>Price{sort === "cheapest" && " ▴"}</th>
                 <th className="hidden md:table-cell py-3 text-right font-normal">Mins</th>
-                <th className="hidden md:table-cell py-3 text-right font-normal">G</th>
-                <th className="hidden md:table-cell py-3 text-right font-normal">A</th>
-                <th className="hidden md:table-cell py-3 text-right font-normal" title="Expected goals per 90 minutes">xG/90</th>
-                <th className="hidden md:table-cell py-3 text-right font-normal" title="Expected assists per 90 minutes">xA/90</th>
-                <th className="hidden md:table-cell py-3 text-right font-normal" title="Defensive actions per 90 minutes">Def/90</th>
-                <th className="py-3 pr-4 pl-3 text-right font-normal md:text-left"><span className="md:hidden">Score</span><span className="hidden md:inline">Scout score</span></th>
+                <th className={`hidden md:table-cell py-3 text-right font-normal ${hl("g")}`}>G</th>
+                <th className={`hidden md:table-cell py-3 text-right font-normal ${hl("a")}`}>A</th>
+                <th className={`hidden md:table-cell py-3 text-right font-normal ${hl("xg")}`} title="Expected goals per 90 minutes">xG/90</th>
+                <th className={`hidden md:table-cell py-3 text-right font-normal ${hl("xa")}`} title="Expected assists per 90 minutes">xA/90</th>
+                <th className={`hidden md:table-cell py-3 text-right font-normal ${hl("def")}`} title="Defensive actions per 90 minutes">Def/90</th>
+                {extra !== null && <th className={`${extra} py-3 pl-3 text-right font-semibold whitespace-nowrap text-lime`} title={S.label}>{S.short} ▾</th>}
+                <th className="py-3 pr-4 pl-3 text-right font-normal md:text-left"><span className={sort === "score" ? "font-semibold text-lime" : ""}><span className="md:hidden">Score</span><span className="hidden md:inline">Scout score</span>{sort === "score" && " ▾"}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -119,18 +134,22 @@ async function Results({ searchParams }: { searchParams: SP }) {
                   <td className="py-2.5 pr-2 pl-4">
                     <div className="flex items-center gap-2">
                       <StatusDot p={p} />
-                      <Link href={playerHref(p.id)} className="font-semibold hover:text-lime hover:underline">{p.name}</Link>
+                      <div className="flex min-w-0 flex-col">
+                        <Link href={playerHref(p.id)} className="truncate font-semibold hover:text-lime hover:underline">{p.name}</Link>
+                        <span className="text-[11px] text-muted sm:hidden">{p.tla}</span>
+                      </div>
                     </div>
                   </td>
-                  <td className="py-2.5 pl-2"><Link href={teamHref(p.tla)} className="text-soft hover:text-lime">{p.tla}</Link></td>
+                  <td className="hidden sm:table-cell py-2.5 pl-2"><Link href={teamHref(p.tla)} className="text-soft hover:text-lime">{p.tla}</Link></td>
                   <td className="hidden md:table-cell py-2.5 text-soft">{p.pos}</td>
                   <td className="py-2.5 text-right">{money(p.price)}</td>
                   <td className="hidden md:table-cell py-2.5 text-right text-soft">{p.minutes}</td>
-                  <td className="hidden md:table-cell py-2.5 text-right">{p.goals}</td>
-                  <td className="hidden md:table-cell py-2.5 text-right">{p.assists}</td>
-                  <td className="hidden md:table-cell py-2.5 text-right text-soft">{p.p90.xg.toFixed(2)}</td>
-                  <td className="hidden md:table-cell py-2.5 text-right text-soft">{p.p90.xa.toFixed(2)}</td>
-                  <td className="hidden md:table-cell py-2.5 text-right text-soft">{p.p90.defcon.toFixed(1)}</td>
+                  <td className={`hidden md:table-cell py-2.5 text-right ${hl("g")}`}>{p.goals}</td>
+                  <td className={`hidden md:table-cell py-2.5 text-right ${hl("a")}`}>{p.assists}</td>
+                  <td className={`hidden md:table-cell py-2.5 text-right ${hl("xg") || "text-soft"}`}>{p.p90.xg.toFixed(2)}</td>
+                  <td className={`hidden md:table-cell py-2.5 text-right ${hl("xa") || "text-soft"}`}>{p.p90.xa.toFixed(2)}</td>
+                  <td className={`hidden md:table-cell py-2.5 text-right ${hl("def") || "text-soft"}`}>{p.p90.defcon.toFixed(1)}</td>
+                  {extra !== null && <td className={`${extra} py-2.5 pl-3 text-right font-semibold text-lime`}>{S.show!(p)}</td>}
                   <td className="py-2.5 pr-4 pl-3"><div className="flex justify-end md:justify-start"><ScoreBar score={p.score} /></div></td>
                 </tr>
               ))}

@@ -5,6 +5,7 @@ import { clubList, getPlayers, MIN_MINUTES, POSITIONS, POS_LABEL, type Player, t
 import { money, NeedsData, playerHref, PlayersHeader, ScoreBar, StatusDot } from "@/components/players-ui";
 import { teamHref } from "@/components/table-tabs";
 import { PlayerSearch } from "@/components/player-search";
+import { FilterArea } from "@/components/filter-area";
 import { fold } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Scouting" };
@@ -55,6 +56,16 @@ async function Results({ searchParams }: { searchParams: SP }) {
     .filter((p) => !q || fold(p.name).includes(q) || fold(p.fullName).includes(q))
     .sort((a, b) => SORTS[sort].get(b) - SORTS[sort].get(a) || b.minutes - a.minutes);
   const shown = list.slice(0, 50);
+  // Name typed but filtered out? Find who matched the name, to explain which filter hid them.
+  const hidden = q && !list.length ? players.filter((p) => fold(p.name).includes(q) || fold(p.fullName).includes(q)).slice(0, 3) : [];
+  const why = (p: Player) =>
+    [
+      pos && p.pos !== pos && `plays ${POS_LABEL[p.pos].toLowerCase()}`,
+      club && p.tla !== club && `plays for ${p.team}`,
+      maxPrice && p.price > maxPrice && `costs ${money(p.price)}`,
+      p.minutes < minMins && `has ${p.minutes} mins`,
+      fit && p.status !== "available" && `is ${p.status}`,
+    ].filter(Boolean).join(", ");
   const S: Sort = SORTS[sort];
   // Extra column for the sorted stat: everywhere if no desktop column has it, phones only if one does.
   const extra = S.show ? (S.col ? "md:hidden" : "") : null;
@@ -64,8 +75,9 @@ async function Results({ searchParams }: { searchParams: SP }) {
     .map((p) => ({ id: p.id, name: p.name, fullName: p.fullName, tla: p.tla, pos: p.pos, price: p.price }));
 
   return (
-    <>
-      <form action="/scouting" className="grid gap-2.5 rounded-[18px] border border-line bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
+    <FilterArea path="/scouting">
+      {/* key: rebuild the form when the URL changes (e.g. "Clear filters"), so the boxes always match the results */}
+      <form key={new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : [[k, String(v)]]))).toString()} action="/scouting" className="grid gap-2.5 rounded-[18px] border border-line bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs text-muted">Position
           <select name="pos" defaultValue={pos} className={select}>
             <option value="">All positions</option>
@@ -105,12 +117,13 @@ async function Results({ searchParams }: { searchParams: SP }) {
       </form>
 
       <p className="text-sm text-muted">
+        <span className="hidden font-semibold text-lime group-data-[pending]:inline">Updating… </span>
         {list.length} player{list.length === 1 ? "" : "s"} match{list.length > 50 ? " · showing the top 50" : ""} · sorted by {SORTS[sort].label.toLowerCase()}
         {(pos || club || maxPrice || q || fit || minMins !== MIN_MINUTES || sort !== "score") && <Link href="/scouting" className="ml-3 text-lime hover:underline">Clear filters</Link>}
       </p>
 
       {shown.length ? (
-        <div className="overflow-clip rounded-[18px] border border-line bg-card md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
+        <div className="overflow-clip rounded-[18px] border border-line bg-card transition-opacity group-data-[pending]:pointer-events-none group-data-[pending]:opacity-40 md:max-h-[calc(100dvh-11rem)] md:overflow-auto md:overscroll-contain">
           <table className="w-full text-sm md:min-w-[860px]">
             <thead className="sticky top-16 z-20 bg-card shadow-[0_1px_0_#222b36] md:top-0">
               <tr className="text-left text-xs text-muted">
@@ -157,7 +170,16 @@ async function Results({ searchParams }: { searchParams: SP }) {
           </table>
         </div>
       ) : (
-        <p className="rounded-2xl border border-line bg-card p-5 text-soft">No players match those filters. Try a higher price or fewer minutes.</p>
+        <p className="rounded-2xl border border-line bg-card p-5 text-soft transition-opacity group-data-[pending]:opacity-40">No players match those filters.{" "}
+          {hidden.length ? (
+            <>
+              {hidden.map((p, i) => (
+                <span key={p.id}>{i ? "; " : ""}<Link href={playerHref(p.id)} className="font-semibold text-ink hover:text-lime">{p.name}</Link> {why(p)}</span>
+              ))}
+              . Loosen that filter, or tap the name to open his page.
+            </>
+          ) : q ? "No player has that name. Check the spelling." : "Try a higher price or fewer minutes."}
+        </p>
       )}
 
       <details className="rounded-2xl border border-line bg-card p-4 text-sm text-soft">
@@ -173,7 +195,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
           <p>Per-90 numbers are steadied for players with few minutes, so one great cameo doesn&apos;t top the list. Price is the Fantasy Premier League price: a rough value signal, not a real transfer fee.</p>
         </div>
       </details>
-    </>
+    </FilterArea>
   );
 }
 

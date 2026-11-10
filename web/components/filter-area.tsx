@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 export function FilterArea({ path, children }: { path: string; children: ReactNode }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const box = useRef<HTMLDivElement>(null);
 
   const go = (form: HTMLFormElement) => {
     const params = new URLSearchParams();
@@ -21,8 +22,25 @@ export function FilterArea({ path, children }: { path: string; children: ReactNo
     start(() => router.push(qs ? `${path}?${qs}` : path, { scroll: false }));
   };
 
+  // A change made before the page finished loading (slow phones) never reached the handler above.
+  // Once ready, if any box differs from what the page was rendered with, apply it now.
+  useEffect(() => {
+    const form = box.current?.querySelector("form");
+    if (!form) return;
+    const changed = [...form.elements].some((el) =>
+      el instanceof HTMLSelectElement
+        ? [...el.options].some((o) => o.selected !== o.defaultSelected)
+        : el instanceof HTMLInputElement && el.type === "checkbox"
+          ? el.checked !== el.defaultChecked
+          : false,
+    );
+    if (changed) go(form);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div
+      ref={box}
       className="group flex flex-col gap-5"
       data-pending={pending || undefined}
       aria-busy={pending}

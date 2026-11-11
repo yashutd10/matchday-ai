@@ -37,7 +37,7 @@ async function Picker({ searchParams }: { searchParams: SP }) {
       <form action="/scouting/similar" className="flex gap-2 rounded-[18px] border border-line bg-card p-3">
         <label htmlFor="q" className="sr-only">Player name</label>
         <div className="min-w-0 flex-1">
-          <PlayerSearch id="q" players={suggestions} defaultValue={q} placeholder="Type a player, e.g. Salah" className="h-11 min-w-0 rounded-xl border border-line bg-pitch px-3 text-sm text-ink outline-none placeholder:text-[#8a94a3] focus:border-lime/60" />
+          <PlayerSearch id="q" players={suggestions} defaultValue={q} placeholder="Type a player, e.g. Saka" className="h-11 min-w-0 rounded-xl border border-line bg-pitch px-3 text-sm text-ink outline-none placeholder:text-[#8a94a3] focus:border-lime/60" />
         </div>
         <button type="submit" className="h-11 rounded-xl bg-lime px-5 text-sm font-semibold text-pitch">Find</button>
       </form>

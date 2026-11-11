@@ -91,13 +91,53 @@ export type ReportPlayer = {
 export type ReportSide = {
   tla: string;
   /** Goals credited to this side, own goals included (scored by the other team's player). */
-  goals: { name: string; count: number; ownGoal: boolean }[];
+  goals: Goal[];
   starters: ReportPlayer[];
   subs: ReportPlayer[];
   totals: { xg: number | null; saves: number; tackles: number; cbi: number; recoveries: number; yellow: number; red: number };
 };
 
 export type MatchReport = { home: ReportSide; away: ReportSide; potm: (ReportPlayer & { tla: string }) | null; hasLineups: boolean };
+
+/**
+ * Which club is FPL team N? Every player listed on a side of a match votes with his current club code.
+ * (Worked out from the data rather than stored, so an old cached player list can't break it.)
+ */
+function teamCodes(fixtures: FplFixture[], info: Map<number, { tla: string }>) {
+  const votes = new Map<number, Map<string, number>>();
+  for (const f of fixtures)
+    for (const st of f.stats)
+      for (const [team, list] of [[f.team_h, st.h], [f.team_a, st.a]] as const)
+        for (const x of list) {
+          const tla = info.get(x.element)?.tla;
+          if (!tla) continue;
+          const v = votes.get(team) ?? votes.set(team, new Map()).get(team)!;
+          v.set(tla, (v.get(tla) ?? 0) + 1);
+        }
+  return new Map([...votes].map(([team, v]) => [team, [...v].sort((a, b) => b[1] - a[1])[0][0]]));
+}
+
+export type Goal = { name: string; count: number; ownGoal: boolean };
+
+/** Scorers for every finished match, keyed "HOME-AWAY" (e.g. "EVE-COV"). Null when FPL can't be reached. */
+export async function getGoalsByMatch(): Promise<Map<string, { home: Goal[]; away: Goal[] }> | null> {
+  const [fixtures, players] = await Promise.all([loadFixtures(), getPlayers()]);
+  if (!fixtures || !players) return null;
+  const info = new Map(players.map((p) => [p.id, p]));
+  const tlaOf = teamCodes(fixtures, info);
+  const name = (el: number) => info.get(el)?.name ?? `Player ${el}`;
+  const out = new Map<string, { home: Goal[]; away: Goal[] }>();
+  for (const f of fixtures) {
+    if (f.team_h_score === null) continue;
+    const st = (id: string, side: "h" | "a") => f.stats.find((x) => x.identifier === id)?.[side] ?? [];
+    const goals = (side: "h" | "a", other: "h" | "a"): Goal[] => [
+      ...st("goals_scored", side).map((x) => ({ name: name(x.element), count: x.value, ownGoal: false })),
+      ...st("own_goals", other).map((x) => ({ name: name(x.element), count: x.value, ownGoal: true })),
+    ];
+    out.set(`${tlaOf.get(f.team_h)}-${tlaOf.get(f.team_a)}`, { home: goals("h", "a"), away: goals("a", "h") });
+  }
+  return out;
+}
 
 const POS_ORDER: Record<string, number> = { GKP: 0, DEF: 1, MID: 2, FWD: 3, "": 4 };
 
@@ -110,19 +150,7 @@ export async function getMatchReport(homeTla: string, awayTla: string): Promise<
   if (!fixtures || !players) return null;
 
   const info = new Map(players.map((p) => [p.id, p]));
-
-  // Which club is FPL team N? Every player listed on a side of a match votes with his club code.
-  const votes = new Map<number, Map<string, number>>();
-  for (const f of fixtures)
-    for (const st of f.stats)
-      for (const [team, list] of [[f.team_h, st.h], [f.team_a, st.a]] as const)
-        for (const x of list) {
-          const tla = info.get(x.element)?.tla;
-          if (!tla) continue;
-          const v = votes.get(team) ?? votes.set(team, new Map()).get(team)!;
-          v.set(tla, (v.get(tla) ?? 0) + 1);
-        }
-  const tlaOf = new Map([...votes].map(([team, v]) => [team, [...v].sort((a, b) => b[1] - a[1])[0][0]]));
+  const tlaOf = teamCodes(fixtures, info);
 
   const fx = fixtures.find((f) => tlaOf.get(f.team_h) === homeTla && tlaOf.get(f.team_a) === awayTla);
   if (!fx || !fx.event || fx.team_h_score === null) return null;

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { getSeasonFixtures, type SeasonGameweek, type SeasonMatch } from "@/lib/football";
 import { Icon } from "@/components/nav";
 import { FavBadge } from "@/components/fixtures-client";
+import { getGoalsByMatch, type Goal } from "@/lib/match-report";
+
+type Goals = Record<string, { home: Goal[]; away: Goal[] }>;
+const goalText = (gs: Goal[]) => gs.map((g) => `${g.name}${g.count > 1 ? ` ×${g.count}` : ""}${g.ownGoal ? " (OG)" : ""}`).join(", ");
 
 function Verdict({ m }: { m: SeasonMatch }) {
   const p = m.prediction;
@@ -24,9 +28,12 @@ function Verdict({ m }: { m: SeasonMatch }) {
   );
 }
 
-function MatchCard({ m }: { m: SeasonMatch }) {
+function MatchCard({ m, goals }: { m: SeasonMatch; goals?: { home: Goal[]; away: Goal[] } }) {
   const done = m.state === "finished" || m.state === "live";
-  const rows = [{ t: m.home, g: m.score?.[0] }, { t: m.away, g: m.score?.[1] }];
+  const rows = [
+    { t: m.home, g: m.score?.[0], scorers: m.state === "finished" ? goals?.home : undefined },
+    { t: m.away, g: m.score?.[1], scorers: m.state === "finished" ? goals?.away : undefined },
+  ];
   const win = m.score ? (m.score[0] > m.score[1] ? 0 : m.score[1] > m.score[0] ? 1 : -1) : -1;
 
   const body = (
@@ -39,10 +46,13 @@ function MatchCard({ m }: { m: SeasonMatch }) {
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.map((r, i) => (
-          <div key={r.t.tla} className="flex items-center gap-2.5">
+          <div key={r.t.tla} className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1e2632] font-display text-[11px] font-bold">{r.t.tla}</span>
             <span className={`min-w-0 flex-1 text-[15px] leading-tight ${done && win === i ? "font-bold" : done && win !== -1 ? "text-soft" : "font-semibold"}`}>{r.t.name}</span>
             {done && <span className="w-6 text-right font-display text-[22px] font-bold leading-none">{r.g ?? "–"}</span>}
+          </div>
+          {r.scorers && r.scorers.length > 0 && <p className="truncate pl-[38px] pr-8 text-[11px] text-muted">{goalText(r.scorers)}</p>}
           </div>
         ))}
       </div>
@@ -65,7 +75,7 @@ function MatchCard({ m }: { m: SeasonMatch }) {
 
 const arrowCls = "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-soft transition hover:text-ink";
 
-export function FixturesView({ weeks, week, current }: { weeks: Pick<SeasonGameweek, "number" | "state">[]; week: SeasonGameweek; current: number }) {
+export function FixturesView({ weeks, week, current, goals }: { weeks: Pick<SeasonGameweek, "number" | "state">[]; week: SeasonGameweek; current: number; goals?: Goals }) {
   const idx = weeks.findIndex((g) => g.number === week.number);
   const prev = weeks[idx - 1], next = weeks[idx + 1];
   const finished = week.matches.filter((m) => m.state === "finished");
@@ -151,7 +161,7 @@ export function FixturesView({ weeks, week, current }: { weeks: Pick<SeasonGamew
         <section key={date} className="flex flex-col gap-2.5">
           <h3 className="text-xs font-semibold tracking-wider text-muted uppercase">{date}</h3>
           <ul className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
-            {ms.map((m) => <li key={m.id}><MatchCard m={m} /></li>)}
+            {ms.map((m) => <li key={m.id}><MatchCard m={m} goals={goals?.[`${m.home.tla}-${m.away.tla}`]} /></li>)}
           </ul>
         </section>
       ))}
@@ -176,6 +186,11 @@ export async function FixturesFor({ gw }: { gw?: number }) {
   if (!data) return <LiveDataError what="Fixtures" />;
   const week = data.gameweeks.find((g) => g.number === (gw ?? data.current));
   if (!week) return <p className="text-soft">There&apos;s no gameweek {gw} this season.</p>;
-  return <FixturesView weeks={data.gameweeks.map(({ number, state }) => ({ number, state }))} week={week} current={data.current} />;
+  // Scorers come from the FPL feed; if it's down, the cards just show scores.
+  const all = week.matches.some((m) => m.state === "finished") ? await getGoalsByMatch() : null;
+  const goals: Goals | undefined = all
+    ? Object.fromEntries(week.matches.flatMap((m) => { const g = all.get(`${m.home.tla}-${m.away.tla}`); return g ? [[`${m.home.tla}-${m.away.tla}`, g]] : []; }))
+    : undefined;
+  return <FixturesView weeks={data.gameweeks.map(({ number, state }) => ({ number, state }))} week={week} current={data.current} goals={goals} />;
 }
 

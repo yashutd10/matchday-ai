@@ -4,6 +4,7 @@ import { getMatchday } from "@/lib/football";
 import { Crest, ProbBar } from "@/components/ui";
 import { AskBox, Icon } from "@/components/nav";
 import { YourTeamCard } from "@/components/favourite";
+import { StartsIn } from "@/components/fixtures-client";
 
 export default async function Home() {
   const { fixtures, gameweek, source } = await getMatchday();
@@ -15,10 +16,13 @@ export default async function Home() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-6 pb-8 md:px-8 md:pt-10">
         <div className="mb-6 flex items-end justify-between md:mb-8">
           <div>
-            <p className="text-sm text-muted md:text-base">Gameweek {gameweek.number} · {gameweek.date}</p>
-            <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">This Weekend</h1>
+            <p className="mb-1 flex flex-wrap items-center gap-2 text-sm text-muted md:text-base">
+              <span>Next up · {gameweek.date}</span>
+              {gameweek.start && <StartsIn iso={gameweek.start} />}
+            </p>
+            <h1 className="font-display text-4xl font-bold leading-none md:text-6xl">Gameweek {gameweek.number}</h1>
           </div>
-          <span className={`rounded-full border px-2.5 py-1 text-[11px] md:text-xs ${source === "live" ? "border-lime/40 text-lime" : "border-[#2a3441] text-muted"}`}>
+          <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] md:text-xs ${source === "live" ? "border-lime/40 text-lime" : "border-[#2a3441] text-muted"}`}>
             {source === "live" ? "Live data" : "Sample data"}
           </span>
         </div>
@@ -26,9 +30,9 @@ export default async function Home() {
         <div className="grid gap-6 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:gap-8">
           <div className="flex flex-col gap-6 md:sticky md:top-28 md:self-start">
             <section className="flex flex-col gap-4 rounded-[20px] border border-line bg-card p-[18px] md:gap-5 md:p-6">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-lime px-2.5 py-1 text-[11px] font-semibold tracking-wider text-pitch">AI PICK OF THE WEEK</span>
-                <span className="text-sm text-muted">{pick.kickoff}</span>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                <span className="whitespace-nowrap rounded-full bg-lime px-2.5 py-1 text-[11px] font-semibold tracking-wider text-pitch">AI PICK OF THE WEEK</span>
+                <span className="whitespace-nowrap text-sm text-muted">{pick.kickoff}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex w-24 shrink-0 flex-col items-center gap-2 lg:w-28">

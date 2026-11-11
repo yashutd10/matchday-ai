@@ -4,7 +4,8 @@ import { brier, fitV1, fitV2, outcomeOf, type Predictor, type TrainMatch } from 
 
 export type Matchday = {
   source: "live" | "sample";
-  gameweek: { number: number; date: string };
+  /** date: e.g. "Sat 21 Nov – Mon 23 Nov". start: first kickoff (ISO), for "starts in N days". */
+  gameweek: { number: number; date: string; start?: string };
   fixtures: Fixture[];
 };
 
@@ -32,16 +33,16 @@ const emptyRec = (): Rec => ({
 });
 
 const IST = "Asia/Kolkata";
-const fmtKickoff = (iso: string) => {
-  const d = new Date(iso);
-  const day = new Intl.DateTimeFormat("en-GB", { timeZone: IST, weekday: "short" }).format(d);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: IST, hour: "numeric", minute: "2-digit" }).format(d);
-  return `${day} · ${time} IST`;
-};
 const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: IST, weekday: "short", day: "numeric", month: "short" })
     .format(new Date(iso))
     .replace(",", "");
+/** e.g. "Sat 21 Nov · 8:30 PM IST": always with the date, so a match two weeks away never looks like this weekend. */
+const fmtKickoff = (iso: string) => {
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: IST, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return `${fmtDate(iso)} · ${time} IST`;
+};
+const fmtRange = (first: string, last: string) => (fmtDate(first) === fmtDate(last) ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`);
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -217,7 +218,8 @@ export async function getMatchday(): Promise<Matchday> {
   const pickIdx = built.reduce((best, f, i) => (strength(f) > strength(built[best]) ? i : best), 0);
   const [pick] = built.splice(pickIdx, 1);
 
-  return { source: "live", gameweek: { number: md, date: fmtDate(round[0].utcDate) }, fixtures: [pick, ...built] };
+  const first = round[0].utcDate, last = round[round.length - 1].utcDate;
+  return { source: "live", gameweek: { number: md, date: fmtRange(first, last), start: first }, fixtures: [pick, ...built] };
 }
 
 export async function getFixture(id: string) {

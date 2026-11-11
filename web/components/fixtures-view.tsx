@@ -49,13 +49,15 @@ function MatchCard({ m }: { m: SeasonMatch }) {
       <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
         <Verdict m={m} />
         {m.hasPreview && <span className="shrink-0 text-[11px] font-semibold text-lime">Preview →</span>}
+        {m.state === "finished" && <span className="shrink-0 text-[11px] font-semibold text-lime">Report →</span>}
       </div>
     </>
   );
 
   const cls = "flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-card px-4 py-3.5";
-  return m.hasPreview ? (
-    <Link href={`/match/${m.id}`} className={`${cls} transition hover:-translate-y-0.5 hover:border-[#3a4656]`}>{body}</Link>
+  const href = m.hasPreview ? `/match/${m.id}` : m.state === "finished" ? `/result/${m.id}` : null;
+  return href ? (
+    <Link href={href} className={`${cls} transition hover:-translate-y-0.5 hover:border-[#3a4656]`}>{body}</Link>
   ) : (
     <div className={cls}>{body}</div>
   );

@@ -186,10 +186,11 @@ async function loadPlayers(): Promise<Player[] | null> {
 
 /* ---------- replacement finder ---------- */
 
-export type Similar = { player: Player; match: number };
+/** diffs: how far apart on each style stat, in standard deviations (+ = this player does more). */
+export type Similar = { player: Player; match: number; diffs: Partial<Record<keyof Player["p90"], number>> };
 
 /** Players in the same position whose per-90 profile is closest, measured in standard deviations. */
-export function findSimilar(players: Player[], target: Player, limit = 10): Similar[] {
+export function findSimilar(players: Player[], target: Player, limit = Infinity): Similar[] {
   const pool = players.filter((p) => p.pos === target.pos && p.qualified && p.id !== target.id);
   const keys = STYLE[target.pos];
   const sd = Object.fromEntries(
@@ -201,8 +202,9 @@ export function findSimilar(players: Player[], target: Player, limit = 10): Simi
   );
   return pool
     .map((p) => {
-      const d = Math.sqrt(keys.reduce((s, k) => s + ((p.p90[k] - target.p90[k]) / sd[k]) ** 2, 0) / keys.length);
-      return { player: p, match: Math.max(0, Math.round(100 - d * 40)) };
+      const diffs = Object.fromEntries(keys.map((k) => [k, (p.p90[k] - target.p90[k]) / sd[k]]));
+      const d = Math.sqrt(keys.reduce((s, k) => s + diffs[k] ** 2, 0) / keys.length);
+      return { player: p, match: Math.max(0, Math.round(100 - d * 40)), diffs };
     })
     .sort((a, b) => b.match - a.match)
     .slice(0, limit);

@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getPlayers, POS_LABEL } from "@/lib/players";
 import { money, NeedsData, playerHref, PlayersHeader, StatusDot } from "@/components/players-ui";
+import { PlayerSearch } from "@/components/player-search";
+import { fold } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Replacement finder" };
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -13,10 +15,13 @@ async function Picker({ searchParams }: { searchParams: SP }) {
   const players = await getPlayers();
   if (!players) return <NeedsData />;
 
-  const ql = q.toLowerCase();
+  const ql = fold(q);
   const matches = q
-    ? players.filter((p) => p.name.toLowerCase().includes(ql) || p.fullName.toLowerCase().includes(ql)).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
+    ? players.filter((p) => fold(p.name).includes(ql) || fold(p.fullName).includes(ql)).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
     : [];
+  const suggestions = players
+    .filter((p) => p.minutes > 0)
+    .map((p) => ({ id: p.id, name: p.name, fullName: p.fullName, tla: p.tla, pos: p.pos, price: p.price }));
   const popular = [...players].filter((p) => p.qualified).sort((a, b) => b.score * b.price - a.score * a.price).slice(0, 12);
 
   const Chip = ({ p }: { p: (typeof players)[number] }) => (
@@ -31,7 +36,9 @@ async function Picker({ searchParams }: { searchParams: SP }) {
     <>
       <form action="/scouting/similar" className="flex gap-2 rounded-[18px] border border-line bg-card p-3">
         <label htmlFor="q" className="sr-only">Player name</label>
-        <input id="q" name="q" defaultValue={q} required placeholder="Type a player, e.g. Salah" className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-pitch px-3 text-sm outline-none placeholder:text-[#8a94a3] focus:border-lime/60" />
+        <div className="min-w-0 flex-1">
+          <PlayerSearch id="q" players={suggestions} defaultValue={q} placeholder="Type a player, e.g. Salah" className="h-11 min-w-0 rounded-xl border border-line bg-pitch px-3 text-sm text-ink outline-none placeholder:text-[#8a94a3] focus:border-lime/60" />
+        </div>
         <button type="submit" className="h-11 rounded-xl bg-lime px-5 text-sm font-semibold text-pitch">Find</button>
       </form>
       {q && (

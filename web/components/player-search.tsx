@@ -20,7 +20,7 @@ function rank(p: SearchPlayer, q: string) {
  * Name box with live suggestions. Picking a suggestion opens that player's page;
  * pressing Enter without picking runs the normal filtered search.
  */
-export function PlayerSearch({ players, defaultValue, className }: { players: SearchPlayer[]; defaultValue: string; className: string }) {
+export function PlayerSearch({ players, defaultValue, className, placeholder = "Type a name, e.g. Bruno", id }: { players: SearchPlayer[]; defaultValue: string; className: string; placeholder?: string; id?: string }) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
@@ -53,7 +53,8 @@ export function PlayerSearch({ players, defaultValue, className }: { players: Se
         value={value}
         autoComplete="off"
         spellCheck={false}
-        placeholder="Type a name, e.g. Bruno"
+        id={id}
+        placeholder={placeholder}
         role="combobox"
         aria-expanded={show}
         aria-controls={listId}

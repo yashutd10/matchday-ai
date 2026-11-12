@@ -67,7 +67,8 @@ function MatchCard({ m, goals }: { m: SeasonMatch; goals?: { home: Goal[]; away:
   const cls = "flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-card px-4 py-3.5";
   const href = m.hasPreview ? `/match/${m.id}` : m.state === "finished" ? `/result/${m.id}` : null;
   return href ? (
-    <Link href={href} className={`${cls} transition hover:-translate-y-0.5 hover:border-[#3a4656]`}>{body}</Link>
+    // No prefetch: ten result cards on screen would otherwise load ten reports at once.
+    <Link href={href} prefetch={false} className={`${cls} transition hover:-translate-y-0.5 hover:border-[#3a4656]`}>{body}</Link>
   ) : (
     <div className={cls}>{body}</div>
   );

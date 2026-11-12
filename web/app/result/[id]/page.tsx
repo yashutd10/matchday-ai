@@ -21,10 +21,11 @@ async function findMatch(id: string): Promise<{ m: SeasonMatch; gw: number } | n
 }
 
 export async function generateStaticParams() {
-  // Build the latest result ahead of time; every other report is made on first visit, then cached.
+  // Build every finished match's report at deploy time, so opening one never waits on football-data.org.
+  // Results that come in after a deploy are made on first visit, then saved.
   const season = await getSeasonFixtures();
   const done = season?.gameweeks.flatMap((g) => g.matches).filter((m) => m.state === "finished") ?? [];
-  return [{ id: String(done[done.length - 1]?.id ?? 0) }];
+  return done.length ? done.map((m) => ({ id: String(m.id) })) : [{ id: "0" }];
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {

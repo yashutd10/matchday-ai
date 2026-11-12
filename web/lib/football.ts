@@ -68,7 +68,9 @@ async function fetchFootballData(url: string, key: string) {
  * the next visit simply tries again, instead of serving "no data" for hours.
  */
 async function loadSeason(season: number): Promise<ApiMatch[]> {
-  "use cache";
+  // "remote": one saved copy shared by every server instance. With plain "use cache" each instance on
+  // Vercel keeps its own copy, so ten visitors could mean ten requests and trip the 10-a-minute limit.
+  "use cache: remote";
   // Last season never changes, so refresh it daily; this season refreshes every 5 minutes.
   if (season) cacheLife("days");
   else cacheLife("matchday");
@@ -405,7 +407,7 @@ type ApiScorer = {
 };
 
 async function loadScorers(): Promise<Scorer[]> {
-  "use cache";
+  "use cache: remote";
   cacheLife("hours");
   const res = await fetchFootballData("https://api.football-data.org/v4/competitions/PL/scorers?limit=50", process.env.FOOTBALL_DATA_KEY!);
   if (!res.ok) throw new Error(`football-data.org responded ${res.status} for scorers`);

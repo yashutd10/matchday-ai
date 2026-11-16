@@ -53,15 +53,35 @@ export async function POST(req: Request) {
 
   const system = `You are Matchday AI, a sharp, friendly Premier League analyst inside a match-preview app for fans in India.
 Answer using the data below. If the data doesn't cover something (injuries, transfers, xG, players outside the top-scorer list), say so plainly instead of guessing.
-Keep answers short: 2-5 sentences or a few bullets, plain text, no markdown headings. Quote specific numbers from the data.
+Keep answers short: 2-5 sentences or a few bullets. Quote specific numbers from the data.
+Formatting: simple markdown only. Use **bold** for the key team, player or number, "- " bullet lists, and a small table (at most 4 columns) only when comparing several teams or players. No headings, no links, no images.
 Never encourage betting.
 
 DATA
 ${await buildContext()}`;
 
   try {
-    const answer = gemini ? await askGemini(gemini, system, messages) : await askClaude(anthropic!, system, messages);
-    return Response.json({ answer });
+    // The answer is sent as it's written (plain text stream), so the chat can show it word by word.
+    const parts = gemini ? askGemini(gemini, system, messages) : askClaude(anthropic!, system, messages);
+    // Wait for the first words before replying, so a failure can still be reported as a proper error.
+    const first = await parts.next();
+    if (first.done) throw new AskError("The AI didn't return an answer. Try rephrasing your question.");
+    const enc = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(enc.encode(first.value));
+        try {
+          for await (const text of parts) controller.enqueue(enc.encode(text));
+        } catch (err) {
+          console.error("Ask AI stream ended early", err);
+        }
+        controller.close();
+      },
+      cancel() {
+        void parts.return(undefined);
+      },
+    });
+    return new Response(stream, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
   } catch (err) {
     if (err instanceof AskError) return Response.json({ error: err.message }, { status: 502 });
     console.error("Ask AI failed", err);
@@ -79,33 +99,61 @@ function friendlyError(provider: string, envVar: string, status: number, detail:
   return new AskError("The AI analyst couldn't answer right now. Try again.");
 }
 
+/** Reads a "server-sent events" reply and yields each JSON message in it. */
+async function* sse(res: Response): AsyncGenerator<unknown> {
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === "[DONE]") continue;
+        try { yield JSON.parse(data); } catch { /* partial or non-JSON line */ }
+      }
+    }
+  } finally {
+    void reader.cancel().catch(() => {});
+  }
+}
+
 /** Google Gemini (has a free tier). Model can be changed with GEMINI_MODEL. */
-async function askGemini(key: string, system: string, messages: Msg[]) {
+async function* askGemini(key: string, system: string, messages: Msg[]): AsyncGenerator<string> {
   const model = process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-      generationConfig: { maxOutputTokens: 800, temperature: 0.4 },
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.4 },
     }),
   });
-  if (!res.ok) throw friendlyError("Gemini", "GEMINI_API_KEY", res.status, await res.text());
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const answer = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
-  if (!answer) throw new AskError("The AI didn't return an answer. Try rephrasing your question.");
-  return answer;
+  if (!res.ok || !res.body) throw friendlyError("Gemini", "GEMINI_API_KEY", res.status, await res.text());
+  for await (const msg of sse(res)) {
+    const data = msg as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+    if (text) yield text;
+  }
 }
 
 /** Anthropic Claude (paid API). */
-async function askClaude(key: string, system: string, messages: Msg[]) {
+async function* askClaude(key: string, system: string, messages: Msg[]): AsyncGenerator<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: MODEL, max_tokens: 600, system, messages }),
+    body: JSON.stringify({ model: MODEL, max_tokens: 800, system, messages, stream: true }),
   });
-  if (!res.ok) throw friendlyError("Anthropic", "ANTHROPIC_API_KEY", res.status, await res.text());
-  const data = (await res.json()) as { content: { type: string; text?: string }[] };
-  return data.content.filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+  if (!res.ok || !res.body) throw friendlyError("Anthropic", "ANTHROPIC_API_KEY", res.status, await res.text());
+  for await (const msg of sse(res)) {
+    const data = msg as { type?: string; delta?: { type?: string; text?: string } };
+    if (data.type === "content_block_delta" && data.delta?.type === "text_delta" && data.delta.text) yield data.delta.text;
+  }
 }

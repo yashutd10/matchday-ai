@@ -3,3 +3,7 @@ node_modules/
 .env*
 !.env.example
 .DS_Store
+
+# Raw IPL data (download from cricsheet.org; see pipeline/README.md)
+pipeline/*.zip
+__pycache__/

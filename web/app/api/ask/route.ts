@@ -1,4 +1,5 @@
 import { getLeagueTable, getMatchday, getScorers } from "@/lib/football";
+import { buildIplContext } from "@/lib/ipl-context";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -38,8 +39,9 @@ export async function POST(req: Request) {
   }
 
   let messages: Msg[];
+  let league: string | undefined;
   try {
-    ({ messages } = (await req.json()) as { messages: Msg[] });
+    ({ messages, league } = (await req.json()) as { messages: Msg[]; league?: string });
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -51,10 +53,21 @@ export async function POST(req: Request) {
     return Response.json({ error: "Ask a question first." }, { status: 400 });
   }
 
-  const system = `You are Matchday AI, a sharp, friendly Premier League analyst inside a match-preview app for fans in India.
+  const format = `Formatting: simple markdown only. Use **bold** for the key team, player or number, "- " bullet lists, and a small table (at most 4 columns) only when comparing several teams or players. No headings, no links, no images.`;
+  const system = league === "ipl"
+    ? `You are Matchday AI, a sharp, friendly IPL cricket analyst inside a stats app for fans in India.
+Answer using the data below, which this app computed from ball-by-ball records of every IPL match. If the data doesn't cover something (auction prices, injuries, squads for next season, players not listed, anything outside the IPL), say so plainly instead of guessing.
+Player names are in scorecard style (e.g. "V Kohli", "JJ Bumrah"); use the names as given.
+Keep answers short: 2-5 sentences or a few bullets. Quote specific numbers from the data.
+${format}
+Never encourage betting.
+
+DATA
+${buildIplContext()}`
+    : `You are Matchday AI, a sharp, friendly Premier League analyst inside a match-preview app for fans in India.
 Answer using the data below. If the data doesn't cover something (injuries, transfers, xG, players outside the top-scorer list), say so plainly instead of guessing.
 Keep answers short: 2-5 sentences or a few bullets. Quote specific numbers from the data.
-Formatting: simple markdown only. Use **bold** for the key team, player or number, "- " bullet lists, and a small table (at most 4 columns) only when comparing several teams or players. No headings, no links, no images.
+${format}
 Never encourage betting.
 
 DATA

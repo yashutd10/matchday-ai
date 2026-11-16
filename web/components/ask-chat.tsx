@@ -9,26 +9,41 @@ import { Icon } from "@/components/nav";
 type Msg = { role: "user" | "assistant"; content: string; error?: boolean };
 type Chat = { id: string; title: string; updatedAt: number; messages: Msg[] };
 
-const STORE = "matchday.chats.v1";
+type League = "epl" | "ipl";
+const STORE: Record<League, string> = { epl: "matchday.chats.v1", ipl: "matchday.ipl.chats.v1" };
 const MAX_CHATS = 50;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const titleOf = (q: string) => (q.length > 44 ? q.slice(0, 42).trimEnd() + "…" : q);
 
-function loadChats(): Chat[] {
+function loadChats(league: League): Chat[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORE) ?? "[]");
+    const raw = JSON.parse(localStorage.getItem(STORE[league]) ?? "[]");
     return Array.isArray(raw) ? raw.filter((c) => c && typeof c.id === "string" && Array.isArray(c.messages)) : [];
   } catch {
     return [];
   }
 }
-function saveChats(chats: Chat[]) {
+function saveChats(league: League, chats: Chat[]) {
   try {
-    localStorage.setItem(STORE, JSON.stringify(chats.slice(0, MAX_CHATS)));
+    localStorage.setItem(STORE[league], JSON.stringify(chats.slice(0, MAX_CHATS)));
   } catch {
     /* private mode or storage full: the chat still works, it just isn't saved */
   }
 }
+
+const COPY = {
+  epl: { intro: "Ask anything about this Premier League season. Answers use the live table, the next fixtures and the top scorers.", placeholder: "Ask about any team or stat", path: "/ask" },
+  ipl: { intro: "Ask anything about the IPL. Answers use every season's results, the phase-by-phase player ratings, impact scores and ground stats.", placeholder: "Ask about any team or player", path: "/ipl/ask" },
+};
+
+const iplExamples = [
+  "Who are the best death-overs bowlers right now?",
+  "Which batters are strongest in the powerplay?",
+  "Who was the most valuable player last season?",
+  "Compare Kohli and Gill by phase",
+  "Which team has won the most titles?",
+  "Is it better to bat first or chase?",
+];
 
 const examples = [
   "Who has the best home record this season?",
@@ -163,7 +178,9 @@ function ChatList({ chats, activeId, onOpen, onNew, onRename, onDelete }: {
 
 /* ---------- the chat ---------- */
 
-export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) {
+export function AskChat({ initialQuestion = "", league = "epl" }: { initialQuestion?: string; league?: League }) {
+  const text = COPY[league];
+  const starters = league === "ipl" ? iplExamples : examples;
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -186,8 +203,8 @@ export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) 
   const active = chats.find((c) => c.id === activeId) ?? null;
   const messages = active?.messages ?? [];
 
-  useEffect(() => { setChats(loadChats()); setLoaded(true); }, []);
-  useEffect(() => { if (loaded && !busy) saveChats(chats); }, [chats, busy, loaded]);
+  useEffect(() => { setChats(loadChats(league)); setLoaded(true); }, [league]);
+  useEffect(() => { if (loaded && !busy) saveChats(league, chats); }, [chats, busy, loaded, league]);
 
   useEffect(() => {
     const onScroll = () => { stick.current = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 140; };
@@ -228,7 +245,7 @@ export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) 
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({ league, messages: history.map(({ role, content }) => ({ role, content })) }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body || (res.headers.get("content-type") ?? "").includes("json")) {
@@ -252,15 +269,15 @@ export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) 
       abortRef.current = null;
       setBusy(false);
     }
-  }, [patch]);
+  }, [patch, league]);
 
   // A question passed from the homepage box (/ask?q=…) starts a new chat, once.
   useEffect(() => {
     if (!loaded || !initialQuestion || sentInitial.current) return;
     sentInitial.current = true;
-    router.replace("/ask", { scroll: false });
+    router.replace(text.path, { scroll: false });
     void send(initialQuestion, { fresh: true });
-  }, [loaded, initialQuestion, router, send]);
+  }, [loaded, initialQuestion, router, send, text.path]);
 
   const newChat = () => { abortRef.current?.abort(); setActiveId(null); setDrawer(false); setInput(""); boxRef.current?.focus(); };
   const open = (id: string) => { abortRef.current?.abort(); setActiveId(id); setDrawer(false); stick.current = true; };
@@ -321,10 +338,10 @@ export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) 
           <div className="flex flex-1 flex-col justify-center gap-5 py-6">
             <div className="flex flex-col gap-2">
               <p className="font-display text-4xl font-bold leading-none md:text-5xl">What do you want to know?</p>
-              <p className="text-sm text-soft md:text-base">Ask anything about this Premier League season. Answers use the live table, the next fixtures and the top scorers.</p>
+              <p className="text-sm text-soft md:text-base">{text.intro}</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              {examples.map((e) => (
+              {starters.map((e) => (
                 <button key={e} type="button" onClick={() => send(e)} className="rounded-xl border border-line bg-card px-4 py-3 text-left text-sm text-soft transition hover:border-lime/50 hover:text-ink">{e}</button>
               ))}
             </div>
@@ -369,7 +386,7 @@ export function AskChat({ initialQuestion = "" }: { initialQuestion?: string }) 
           <textarea
             id="chat" ref={boxRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(input); } }}
-            placeholder="Ask about any team or stat"
+            placeholder={text.placeholder}
             className="max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[#8a94a3]"
           />
           {busy ? (

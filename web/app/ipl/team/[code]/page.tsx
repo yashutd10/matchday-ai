@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : Math.min(n % 10, 4) % 4]}`;
 
-export default async function IplTeamPage({ params }: { params: Params }) {
+async function IplTeamPageBody({ params }: { params: Params }) {
   const code = (await params).code.toUpperCase();
   if (!teamCodes.includes(code)) notFound();
 
@@ -147,5 +148,24 @@ export default async function IplTeamPage({ params }: { params: Params }) {
         </section>
       </div>
     </main>
+  );
+}
+
+/** Loading placeholder; the page reads the URL, so it streams in under this. */
+function Loading() {
+  return (
+    <main className="mx-auto flex w-full max-w-6xl flex-1 animate-pulse flex-col gap-6 px-5 pt-8 pb-10 md:px-8 md:pt-12" aria-busy="true" aria-label="Loading">
+      <div className="h-28 rounded-[20px] bg-card" />
+      <div className="h-64 rounded-[18px] bg-card" />
+      <div className="h-64 rounded-[18px] bg-card" />
+    </main>
+  );
+}
+
+export default function IplTeamPage({ params }: { params: Params }) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <IplTeamPageBody params={params} />
+    </Suspense>
   );
 }

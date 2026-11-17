@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -64,7 +65,7 @@ function PhaseTable({ p, kind }: { p: IplPlayer; kind: Kind }) {
   );
 }
 
-export default async function IplPlayerPage({ params }: { params: Params }) {
+async function IplPlayerPageBody({ params }: { params: Params }) {
   const p = getPlayer((await params).id);
   if (!p) notFound();
 
@@ -156,5 +157,24 @@ export default async function IplPlayerPage({ params }: { params: Params }) {
         </div>
       </section>
     </main>
+  );
+}
+
+/** Loading placeholder; the page reads the URL, so it streams in under this. */
+function Loading() {
+  return (
+    <main className="mx-auto flex w-full max-w-6xl flex-1 animate-pulse flex-col gap-6 px-5 pt-8 pb-10 md:px-8 md:pt-12" aria-busy="true" aria-label="Loading">
+      <div className="h-28 rounded-[20px] bg-card" />
+      <div className="h-64 rounded-[18px] bg-card" />
+      <div className="h-64 rounded-[18px] bg-card" />
+    </main>
+  );
+}
+
+export default function IplPlayerPage({ params }: { params: Params }) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <IplPlayerPageBody params={params} />
+    </Suspense>
   );
 }

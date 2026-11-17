@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    // Don't offer framework upgrades when "npm run dev" starts: accepting one stops the dev server.
+    // Upgrade Next.js on purpose instead (npx next upgrade), then test before pushing.
+    agentUpgrade: false,
   },
   // Lets phones and laptops on the home Wi-Fi use the dev server (development only).
   allowedDevOrigins: ["192.168.*.*"],

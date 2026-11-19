@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { card, main, PageHeader, PlayerName, TeamLink } from "@/components/ipl-ui";
-import { impactText, insights, ipl } from "@/lib/ipl";
+import { impactText, insights, ipl, type Venue } from "@/lib/ipl";
 
 export const metadata: Metadata = { title: "IPL insights" };
 
@@ -104,36 +104,55 @@ export default function IplInsights() {
         {byScore.length > 1 && (
           <p className="text-sm text-soft">Highest-scoring recently: <b className="text-ink">{byScore[0].name}</b> ({byScore[0].recent.avgFirst} average first innings). Lowest: <b className="text-ink">{byScore[byScore.length - 1].name}</b> ({byScore[byScore.length - 1].recent.avgFirst}).</p>
         )}
-        <div className={`${card} overflow-clip`}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-muted">
-                <th className="py-3 pl-4 text-left font-normal">Ground</th>
-                <th className="hidden py-3 text-right font-normal sm:table-cell">Matches</th>
-                <th className="py-3 text-right font-normal" title="Average first-innings score, last three seasons">Avg 1st inns<span className="hidden sm:inline"> (recent)</span></th>
-                <th className="hidden py-3 text-right font-normal md:table-cell">All-time avg</th>
-                <th className="py-3 text-right font-normal">Chasing wins</th>
-                <th className="hidden py-3 text-right font-normal md:table-cell">Sixes a match</th>
-                <th className="hidden py-3 pr-4 text-right font-normal sm:table-cell">Highest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {venues.map((v) => (
-                <tr key={v.name} className="border-t border-line">
-                  <td className="py-2.5 pl-4"><div className="flex flex-col"><span className="font-semibold">{v.name}</span><span className="text-[11px] text-muted">{v.city}</span></div></td>
-                  <td className="hidden py-2.5 text-right text-soft sm:table-cell">{v.matches}</td>
-                  <td className="py-2.5 text-right font-display text-lg font-bold">{v.recent.avgFirst ?? "–"}</td>
-                  <td className="hidden py-2.5 text-right text-soft md:table-cell">{v.avgFirst ?? "–"}</td>
-                  <td className={`py-2.5 pr-4 text-right sm:pr-0 ${(v.chasePct ?? 50) >= 55 ? "font-semibold text-lime" : (v.chasePct ?? 50) <= 45 ? "text-[#ff9a52]" : ""}`}>{v.chasePct ?? "–"}%</td>
-                  <td className="hidden py-2.5 text-right text-soft md:table-cell">{v.sixesPerMatch}</td>
-                  <td className="hidden py-2.5 pr-4 text-right text-soft sm:table-cell">{v.highest}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-muted">Grounds with at least 10 IPL matches. “Recent” is the last three seasons; “–” means no matches there recently. Chasing wins is all-time.</p>
+        <GroundTable rows={venues.filter((v) => v.recent.matches > 0)} recent />
+        <details className="group/former">
+          <summary className="cursor-pointer list-none text-sm text-lime hover:underline">
+            <span className="group-open/former:hidden">Show former grounds ({venues.filter((v) => v.recent.matches === 0).length}) →</span>
+            <span className="hidden group-open/former:inline">Hide former grounds</span>
+          </summary>
+          <div className="mt-3 flex flex-col gap-3">
+            <p className="text-sm text-soft">Grounds the IPL has used before but not in the last three seasons: South Africa hosted all of 2009 (during India&apos;s general election), the UAE hosted part of 2014, all of 2020 and the second half of 2021, and the 2022 league stage was played only in Mumbai and Pune. Rajkot was home to Gujarat Lions, a franchise that no longer exists, and Punjab Kings have moved from Mohali to the new stadium in New Chandigarh.</p>
+            <GroundTable rows={venues.filter((v) => v.recent.matches === 0)} />
+          </div>
+        </details>
+        <p className="text-xs text-muted">Grounds with at least 10 IPL matches. &ldquo;Recent&rdquo; is the last three seasons. For current grounds, chasing wins are from the last three seasons; for former grounds, all their matches.</p>
       </section>
     </main>
+  );
+}
+
+function GroundTable({ rows, recent }: { rows: Venue[]; recent?: boolean }) {
+  return (
+    <div className={`${card} overflow-clip`}>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-muted">
+            <th className="py-3 pl-4 text-left font-normal">Ground</th>
+            <th className="hidden py-3 text-right font-normal sm:table-cell">Matches</th>
+            {recent && <th className="py-3 text-right font-normal" title="Average first-innings score, last three seasons">Avg 1st inns<span className="hidden sm:inline"> (recent)</span></th>}
+            <th className={`py-3 text-right font-normal ${recent ? "hidden md:table-cell" : ""}`}>All-time avg</th>
+            <th className="py-3 text-right font-normal">Chasing wins</th>
+            <th className="hidden py-3 text-right font-normal md:table-cell">Sixes a match</th>
+            <th className="hidden py-3 pr-4 text-right font-normal sm:table-cell">Highest</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((v) => {
+            const chase = recent ? v.recent.chasePct ?? v.chasePct : v.chasePct;
+            return (
+              <tr key={v.name} className="border-t border-line">
+                <td className="py-2.5 pl-4"><div className="flex flex-col"><span className="font-semibold">{v.name}</span><span className="text-[11px] text-muted">{v.city}</span></div></td>
+                <td className="hidden py-2.5 text-right text-soft sm:table-cell">{v.matches}</td>
+                {recent && <td className="py-2.5 text-right font-display text-lg font-bold">{v.recent.avgFirst ?? "–"}</td>}
+                <td className={`py-2.5 text-right ${recent ? "hidden text-soft md:table-cell" : "font-display text-lg font-bold"}`}>{v.avgFirst ?? "–"}</td>
+                <td className={`py-2.5 pr-4 text-right sm:pr-0 ${(chase ?? 50) >= 55 ? "font-semibold text-lime" : (chase ?? 50) <= 45 ? "text-[#ff9a52]" : ""}`}>{chase ?? "–"}%</td>
+                <td className="hidden py-2.5 text-right text-soft md:table-cell">{v.sixesPerMatch}</td>
+                <td className="hidden py-2.5 pr-4 text-right text-soft sm:table-cell">{v.highest}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

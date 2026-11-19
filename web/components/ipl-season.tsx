@@ -97,7 +97,7 @@ export function SeasonView({ s }: { s: Season }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted">
-                  <th className={`${th} w-9`}>#</th>
+                  <th className={`${th} w-14 pr-3 text-right`}>#</th>
                   <th className={`${th} pl-0`}>Team</th>
                   <th className={`${th} text-right`}>P</th>
                   <th className={`${th} text-right`}>W</th>
@@ -110,7 +110,7 @@ export function SeasonView({ s }: { s: Season }) {
               <tbody>
                 {s.table.map((r, i) => (
                   <tr key={r.team} className="border-t border-line">
-                    <td className={`py-2.5 pl-4 text-muted ${top4 && i < 4 ? "shadow-[inset_3px_0_0_#c6f432]" : ""}`}>{i + 1}</td>
+                    <td className={`py-2.5 pr-3 pl-4 text-right tabular-nums text-muted ${top4 && i < 4 ? "shadow-[inset_3px_0_0_#c6f432]" : ""}`}>{i + 1}</td>
                     <td className="py-2.5">
                       <div className="flex items-center gap-2.5">
                         <TeamBadge code={r.team} size="sm" />
@@ -148,7 +148,7 @@ export function SeasonView({ s }: { s: Season }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted">
-                  <th className={`${th} w-9`}>#</th><th className={`${th} pl-0`}>Batter</th>
+                  <th className={`${th} w-14 pr-3 text-right`}>#</th><th className={`${th} pl-0`}>Batter</th>
                   <th className={`${th} hidden text-right sm:table-cell`}>Inns</th><th className={`${th} hidden text-right sm:table-cell`}>Avg</th>
                   <th className={`${th} text-right`}>SR</th><th className={`${th} hidden text-right md:table-cell`}>HS</th><th className={`${th} pr-4 text-right`}>Runs</th>
                 </tr>
@@ -156,7 +156,7 @@ export function SeasonView({ s }: { s: Season }) {
               <tbody>
                 {s.topRuns.slice(0, 10).map((p, i) => (
                   <tr key={p.name} className="border-t border-line">
-                    <td className="py-2.5 pl-4 text-muted">{i + 1}</td>
+                    <td className="py-2.5 pr-3 pl-4 text-right tabular-nums text-muted">{i + 1}</td>
                     <td className="py-2.5"><div className="flex flex-col"><PlayerName name={p.name} className="font-semibold" /><span className="text-[11px] text-muted">{p.team}{p["100s"] ? ` · ${p["100s"]}×100` : ""}{p["50s"] ? ` · ${p["50s"]}×50` : ""}</span></div></td>
                     <td className={`${num} hidden text-soft sm:table-cell`}>{p.inns}</td>
                     <td className={`${num} hidden text-soft sm:table-cell`}>{p.avg ?? "–"}</td>
@@ -176,7 +176,7 @@ export function SeasonView({ s }: { s: Season }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted">
-                  <th className={`${th} w-9`}>#</th><th className={`${th} pl-0`}>Bowler</th>
+                  <th className={`${th} w-14 pr-3 text-right`}>#</th><th className={`${th} pl-0`}>Bowler</th>
                   <th className={`${th} hidden text-right sm:table-cell`}>Overs</th><th className={`${th} hidden text-right sm:table-cell`}>Avg</th>
                   <th className={`${th} text-right`}>Econ</th><th className={`${th} hidden text-right md:table-cell`}>Best</th><th className={`${th} pr-4 text-right`}>Wkts</th>
                 </tr>
@@ -184,7 +184,7 @@ export function SeasonView({ s }: { s: Season }) {
               <tbody>
                 {s.topWickets.slice(0, 10).map((p, i) => (
                   <tr key={p.name} className="border-t border-line">
-                    <td className="py-2.5 pl-4 text-muted">{i + 1}</td>
+                    <td className="py-2.5 pr-3 pl-4 text-right tabular-nums text-muted">{i + 1}</td>
                     <td className="py-2.5"><div className="flex flex-col"><PlayerName name={p.name} className="font-semibold" /><span className="text-[11px] text-muted">{p.team} · {p.dot}% dot balls</span></div></td>
                     <td className={`${num} hidden text-soft sm:table-cell`}>{p.overs}</td>
                     <td className={`${num} hidden text-soft sm:table-cell`}>{p.avg ?? "–"}</td>

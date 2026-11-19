@@ -66,13 +66,13 @@ export function IplSearch({ items, placeholder, defaultValue = "", name, classNa
         <p className="absolute inset-x-0 top-full z-30 mt-1.5 rounded-xl border border-line bg-card px-4 py-3 text-sm text-soft shadow-[0_12px_32px_rgba(0,0,0,0.45)]">No one called &ldquo;{value.trim()}&rdquo; here.</p>
       )}
       {show && (
-        <ul id={listId} role="listbox" className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-line bg-card shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+        <ul id={listId} role="listbox" className="absolute top-full left-0 z-30 mt-1.5 w-full min-w-64 overflow-hidden rounded-xl border border-line bg-card shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
           {moved && <li className="px-4 py-2 text-[11px] text-muted">{elsewhereLabel ?? "Found in the other list"}</li>}
           {matches.map((it, i) => (
             <li key={it.href} role="option" aria-selected={i === active} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => pick(it)}
-              className={`flex cursor-pointer items-center justify-between gap-3 border-t border-line px-4 py-2.5 first:border-t-0 ${i === active ? "bg-[#1e2632]" : ""}`}>
-              <span className="flex min-w-0 flex-col"><span className="truncate text-sm font-semibold">{it.alt ?? it.label}</span>{it.alt && <span className="truncate text-[11px] text-muted">{it.label}</span>}</span>
-              <span className="shrink-0 text-xs text-muted">{it.sub}</span>
+              className={`flex cursor-pointer flex-col border-t border-line px-4 py-2.5 first:border-t-0 ${i === active ? "bg-[#1e2632]" : ""}`}>
+              <span className="truncate text-sm font-semibold">{it.alt ?? it.label}</span>
+              <span className="truncate text-[11px] text-muted">{[it.alt && it.alt !== it.label ? it.label : "", it.sub].filter(Boolean).join(" · ")}</span>
             </li>
           ))}
         </ul>

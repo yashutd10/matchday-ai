@@ -114,14 +114,16 @@ async function Body({ searchParams }: { searchParams: SP }) {
     const asW = matchups.filter((m) => m.bowl === legacy).reduce((s, m) => s + m.balls, 0);
     if (asB >= asW) bat = legacy; else bowl = legacy;
   }
+  // Same player in both boxes can't be a head to head (old or hand-typed links): show him as a bowler.
+  if (bat && bat === bowl) bat = "";
   const sort: SortKey = one(sp.sort) in SORTS ? (one(sp.sort) as SortKey) : "balls";
   const min = MINS.includes(Number(one(sp.min)) as (typeof MINS)[number]) ? Number(one(sp.min)) : minMatchupBalls;
 
   const teamOf = new Map(players.map((p) => [p.name, p.team]));
   const batters = new Set<string>(), bowlers = new Set<string>();
   for (const m of matchups) { batters.add(m.bat); bowlers.add(m.bowl); }
-  const batItems: SearchItem[] = [...batters].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(n, bowl, { sort: one(sp.sort), min: one(sp.min) }) }));
-  const bowlItems: SearchItem[] = [...bowlers].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(bat, n, { sort: one(sp.sort), min: one(sp.min) }) }));
+  const batItems: SearchItem[] = [...batters].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(n, n === bowl ? "" : bowl, { sort: one(sp.sort), min: one(sp.min) }) }));
+  const bowlItems: SearchItem[] = [...bowlers].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(n === bat ? "" : bat, n, { sort: one(sp.sort), min: one(sp.min) }) }));
 
   // Typed a bowler in the batter box (or the reverse)? Offer him in his own role.
   const bowlAsBat: SearchItem[] = [...bowlers].filter((n) => !batters.has(n)).sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link("", n, { sort: one(sp.sort), min: one(sp.min) }) }));

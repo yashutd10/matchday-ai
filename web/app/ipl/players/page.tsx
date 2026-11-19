@@ -74,7 +74,7 @@ async function List({ searchParams }: { searchParams: SP }) {
           <table className="w-full text-sm">
             <thead className="sticky top-16 z-[5] bg-card shadow-[0_1px_0_#222b36] md:top-[72px]">
               <tr className="text-xs text-muted">
-                <th className="w-8 py-3 pl-4 text-left font-normal">#</th>
+                <th className="w-14 py-3 pr-3 pl-4 text-right font-normal">#</th>
                 <th className="py-3 text-left font-normal">Player</th>
                 {PHASES.map((p) => <th key={p} className={`w-11 py-3 text-center font-normal sm:w-14 ${hl(p)}`} title={PHASE_OVERS[p]}>{p === "all" ? "All" : p === "pp" ? "PP" : PHASE_LABEL[p].slice(0, 3)}{sort === p && " ▾"}</th>)}
                 <th className="hidden py-3 pl-3 text-right font-normal md:table-cell">{kind === "bat" ? "Runs" : "Wkts"}</th>
@@ -85,7 +85,7 @@ async function List({ searchParams }: { searchParams: SP }) {
             <tbody>
               {shown.map((p, i) => (
                 <tr key={p.id} className="border-t border-line">
-                  <td className="py-2.5 pl-4 text-muted">{i + 1}</td>
+                  <td className="py-2.5 pr-3 pl-4 text-right tabular-nums text-muted">{i + 1}</td>
                   <td className="py-2.5 pr-1">
                     <div className="flex min-w-0 flex-col">
                       <Link href={`/ipl/player/${p.id}`} className="truncate font-semibold hover:text-lime hover:underline" title={p.full}>{p.full ?? p.name}</Link>

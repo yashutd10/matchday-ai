@@ -2,12 +2,12 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fold } from "@/lib/text";
+import { fold, nameMatch } from "@/lib/text";
 
 export type SearchItem = { label: string; sub: string; href: string };
 
 /** Search box with live suggestions; picking one opens its page. */
-export function IplSearch({ items, placeholder, defaultValue = "" }: { items: SearchItem[]; placeholder: string; defaultValue?: string }) {
+export function IplSearch({ items, placeholder, defaultValue = "", name, className }: { items: SearchItem[]; placeholder: string; defaultValue?: string; name?: string; className?: string }) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
@@ -18,11 +18,7 @@ export function IplSearch({ items, placeholder, defaultValue = "" }: { items: Se
   const matches = useMemo(() => {
     const q = fold(value.trim());
     if (q.length < 2) return [];
-    const rank = (label: string) => {
-      const l = fold(label);
-      return l.split(/[\s.\-']+/).some((w) => w.startsWith(q)) ? 0 : l.includes(q) ? 1 : -1;
-    };
-    return items.map((it) => ({ it, r: rank(it.label) })).filter((m) => m.r >= 0).sort((a, b) => a.r - b.r).slice(0, 7).map((m) => m.it);
+    return items.map((it, i) => ({ it, i, r: nameMatch(q, it.label) })).filter((m) => m.r >= 0).sort((a, b) => a.r - b.r || a.i - b.i).slice(0, 7).map((m) => m.it);
   }, [items, value]);
 
   const show = open && matches.length > 0;
@@ -31,9 +27,9 @@ export function IplSearch({ items, placeholder, defaultValue = "" }: { items: Se
   return (
     <div ref={box} className="relative">
       <input
-        value={value} autoComplete="off" spellCheck={false} placeholder={placeholder} aria-label={placeholder}
+        name={name} value={value} autoComplete="off" spellCheck={false} placeholder={placeholder} aria-label={placeholder}
         role="combobox" aria-expanded={show} aria-controls={listId} aria-autocomplete="list"
-        className="h-12 w-full rounded-xl border border-line bg-card px-4 text-sm text-ink outline-none placeholder:text-[#8a94a3] focus:border-lime/60"
+        className={className ?? "h-12 w-full rounded-xl border border-line bg-card px-4 text-sm text-ink outline-none placeholder:text-[#8a94a3] focus:border-lime/60"}
         onChange={(e) => { setValue(e.target.value); setOpen(true); setActive(-1); }}
         onFocus={() => setOpen(true)}
         onBlur={(e) => { if (!box.current?.contains(e.relatedTarget as Node)) setOpen(false); }}
@@ -41,7 +37,8 @@ export function IplSearch({ items, placeholder, defaultValue = "" }: { items: Se
           if (!show) return;
           if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => (a + 1) % matches.length); }
           else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => (a <= 0 ? matches.length - 1 : a - 1)); }
-          else if (e.key === "Enter") { e.preventDefault(); pick(matches[Math.max(active, 0)]); }
+          // In a filter form, Enter without a highlighted suggestion filters the list instead.
+          else if (e.key === "Enter" && (active >= 0 || !name)) { e.preventDefault(); pick(matches[Math.max(active, 0)]); }
           else if (e.key === "Escape") setOpen(false);
         }}
       />

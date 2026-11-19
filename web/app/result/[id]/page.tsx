@@ -59,11 +59,14 @@ function Skeleton() {
 
 /* ---------- pieces ---------- */
 
-const Ball = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="shrink-0">
-    <circle cx="12" cy="12" r="9" /><path d="M12 7l4 3-1.5 4.5h-5L8 10z" />
+const Ball = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
+    <circle cx="12" cy="12" r="10.5" fill="#f2f4f7" />
+    <path d="M12 7.2l3.6 2.6-1.4 4.2H9.8L8.4 9.8z" fill="#0b0f14" />
+    <path d="M12 7.2V2.6M15.6 9.8l4.4-1.4M14.2 14l2.7 3.8M9.8 14l-2.7 3.8M8.4 9.8L4 8.4" stroke="#0b0f14" strokeWidth="1.4" />
   </svg>
 );
+const Goal = () => <span role="img" aria-label="Goal" className="inline-flex"><Ball /></span>;
 const Card = ({ red }: { red?: boolean }) => (
   <span aria-label={red ? "Red card" : "Yellow card"} className={`inline-block h-3 w-2 rounded-[2px] ${red ? "bg-[#ff5c5c]" : "bg-[#ffd23f]"}`} />
 );
@@ -110,7 +113,7 @@ function PlayerRow({ p }: { p: ReportPlayer }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
           <Link href={playerHref(p.id)} className="truncate text-sm font-semibold hover:text-lime">{p.name}</Link>
-          {Array.from({ length: p.goals }, (_, i) => <span key={`g${i}`} className="text-lime"><Ball /></span>)}
+          {Array.from({ length: p.goals }, (_, i) => <Goal key={`g${i}`} />)}
           {p.yellow > 0 && <Card />}
           {p.red > 0 && <Card red />}
         </div>
@@ -127,7 +130,7 @@ function PlayerRow({ p }: { p: ReportPlayer }) {
         </span>
       </div>
       {p.points !== null && (
-        <span title="Fantasy Premier League points" className={`flex h-7 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 font-display text-sm font-bold ${p.points >= 9 ? "bg-lime text-pitch" : p.points >= 5 ? "bg-[#1f6b46]" : "bg-[#1e2632] text-soft"}`}>
+        <span title={`${p.points} Fantasy Premier League points`} aria-label={`${p.points} FPL points`} className={`flex h-7 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 font-display text-sm font-bold ${p.points >= 9 ? "bg-lime text-pitch" : p.points >= 5 ? "bg-[#1f6b46]" : "bg-[#1e2632] text-soft"}`}>
           {p.points}
         </span>
       )}
@@ -141,7 +144,10 @@ function Lineup({ name, side, color }: { name: string; side: ReportSide; color: 
       <h3 className="mb-1 flex items-center gap-2 font-display text-lg font-bold">
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />{name}
       </h3>
-      <p className="text-[11px] font-semibold tracking-wider text-muted uppercase">Starting XI</p>
+      <div className="flex items-center justify-between text-[11px] font-semibold tracking-wider text-muted uppercase">
+        <span>Starting XI</span>
+        <span title="Fantasy Premier League points for this match">FPL pts</span>
+      </div>
       <ul>{side.starters.map((p) => <PlayerRow key={p.id} p={p} />)}</ul>
       {side.subs.length > 0 && (
         <>
@@ -249,14 +255,25 @@ async function Report({ params }: { params: Params }) {
           </div>
 
           {r.hasLineups && (
+            <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-line bg-card px-4 py-3 text-xs text-soft">
+              <span className="font-semibold text-ink">Key</span>
+              <span className="flex items-center gap-1.5"><Ball /> Goal</span>
+              <span className="flex items-center gap-1.5"><Card /> Yellow card</span>
+              <span className="flex items-center gap-1.5"><Card red /> Red card</span>
+              <span className="flex items-center gap-1.5"><span className="flex h-5 min-w-6 items-center justify-center rounded-md bg-[#1e2632] px-1 font-display text-xs font-bold">2</span> FPL points for this match</span>
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-[#1f6b46]" /> 5–8 good</span>
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-lime" /> 9+ standout</span>
+            </div>
             <div className="grid gap-5 md:grid-cols-2">
               <Lineup name={m.home.name} side={r.home} color="#4c8dff" />
               <Lineup name={m.away.name} side={r.away} color="#ff9a52" />
             </div>
+            </div>
           )}
 
           <p className="text-xs leading-relaxed text-muted">
-            Player data from the Fantasy Premier League. The number on the right of each player is his FPL points for this match.
+            Player data from the Fantasy Premier League. FPL points: 2 for playing an hour, more for goals, assists, clean sheets, saves and bonus points for the best performers; fewer for cards and goals conceded.
             Possession, shots and goal times aren&apos;t in any free data feed, so they&apos;re not shown.
           </p>
         </>

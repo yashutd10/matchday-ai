@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fold } from "@/lib/text";
+import { fold, nameMatch } from "@/lib/text";
 
 export type SearchPlayer = { id: number; name: string; fullName: string; tla: string; pos: string; price: number };
 
@@ -13,7 +13,9 @@ function rank(p: SearchPlayer, q: string) {
   if (short.startsWith(q) || short.split(/[\s.\-']+/).some((w) => w.startsWith(q))) return 0;
   if (full.split(/[\s\-']+/).some((w) => w.startsWith(q))) return 1;
   if (short.includes(q) || full.includes(q)) return 2;
-  return -1;
+  // Close spellings: "odegard" → Ødegaard, "salah mo" → Mohamed Salah
+  const fuzzy = Math.min(...[p.name, p.fullName].map((n) => nameMatch(q, n)).map((r) => (r < 0 ? 9 : r)));
+  return fuzzy < 9 ? 3 : -1;
 }
 
 /**

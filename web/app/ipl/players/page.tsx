@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { FilterArea } from "@/components/filter-area";
 import { card, main, PageHeader, Rating, TeamLink } from "@/components/ipl-ui";
 import { impactText, ipl, minPhaseBalls, PHASE_LABEL, PHASE_OVERS, PHASES, players, ratingSeasons, teamName, type IplPlayer, type Kind, type Phase } from "@/lib/ipl";
-import { fold } from "@/lib/text";
+import { nameMatch } from "@/lib/text";
+import { IplSearch } from "@/components/ipl-search";
 
 export const metadata: Metadata = { title: "IPL player ratings" };
 
@@ -18,15 +19,18 @@ async function List({ searchParams }: { searchParams: SP }) {
   const sort = ([...PHASES, "impact"] as string[]).includes(one(sp.sort)) ? (one(sp.sort) as Phase | "impact") : "all";
   const team = one(sp.team).toUpperCase();
   const old = one(sp.old) === "1";
-  const q = fold(one(sp.q).trim());
+  const q = one(sp.q).trim();
   const teams = [...new Set(players.filter((p) => p.last === ipl.latest).map((p) => p.team))].sort();
 
   const value = (p: IplPlayer) => (sort === "impact" ? p.impact : p.rating[kind][sort] ?? -1);
   const list = players
     .filter((p) => Object.keys(p.rating[kind]).length > 0)
-    .filter((p) => (old || p.last === ipl.latest) && (!team || p.team === team) && (!q || fold(p.name).includes(q)))
+    .filter((p) => (old || p.last === ipl.latest) && (!team || p.team === team) && (!q || nameMatch(q, p.name) >= 0))
     .sort((a, b) => value(b) - value(a) || (b.rating[kind].all ?? -1) - (a.rating[kind].all ?? -1));
   const shown = list.slice(0, 60);
+  const suggestions = players
+    .filter((p) => Object.keys(p.rating.bat).length || Object.keys(p.rating.bowl).length || p.last === ipl.latest)
+    .map((p) => ({ label: p.name, sub: `${p.team}${p.type.bat ?? p.type.bowl ? ` · ${p.type.bat ?? p.type.bowl}` : ""}`, href: `/ipl/player/${p.id}` }));
   const hl = (k: string) => (sort === k ? "font-semibold text-lime" : "");
 
   return (
@@ -45,7 +49,7 @@ async function List({ searchParams }: { searchParams: SP }) {
           <select name="team" defaultValue={team} className={select}><option value="">All teams</option>{teams.map((t) => <option key={t} value={t}>{teamName(t)}</option>)}</select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">Name
-          <input name="q" defaultValue={one(sp.q)} placeholder="e.g. Kohli" className={`${select} placeholder:text-[#8a94a3]`} />
+          <IplSearch name="q" items={suggestions} defaultValue={q} placeholder="e.g. Kohli" className={`${select} w-full placeholder:text-[#8a94a3]`} />
         </label>
         <div className="flex items-end gap-2">
           <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line px-3 text-sm text-soft">
@@ -94,7 +98,12 @@ async function List({ searchParams }: { searchParams: SP }) {
           </table>
         </div>
       ) : (
-        <p className={`${card} p-5 text-soft`}>No players match. Try clearing a filter.</p>
+        <p className={`${card} p-5 text-soft`}>
+          No {kind === "bat" ? "batters" : "bowlers"} match.{" "}
+          {q && players.some((p) => nameMatch(q, p.name) >= 0)
+            ? <>Try {kind === "bat" ? <Link href={`/ipl/players?kind=bowl&q=${encodeURIComponent(q)}&old=1`} className="text-lime hover:underline">bowlers</Link> : <Link href={`/ipl/players?q=${encodeURIComponent(q)}&old=1`} className="text-lime hover:underline">batters</Link>}, or pick him from the suggestions to open his page.</>
+            : q ? "Check the spelling, or pick a name from the suggestions as you type." : "Try clearing a filter."}
+        </p>
       )}
 
       <details className={`${card} p-4 text-sm text-soft`}>

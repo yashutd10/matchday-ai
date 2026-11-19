@@ -6,7 +6,7 @@ import { money, NeedsData, playerHref, PlayersHeader, ScoreBar, StatusDot } from
 import { teamHref } from "@/components/table-tabs";
 import { PlayerSearch } from "@/components/player-search";
 import { FilterArea } from "@/components/filter-area";
-import { fold } from "@/lib/text";
+import { anyNameMatches } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Scouting" };
 
@@ -47,17 +47,17 @@ async function Results({ searchParams }: { searchParams: SP }) {
   const minMins = Number(one(sp.mins)) || MIN_MINUTES;
   const fit = one(sp.fit) === "1";
   const sort: SortKey = one(sp.sort) in SORTS ? (one(sp.sort) as SortKey) : "score";
-  const q = fold(one(sp.q).trim());
+  const q = one(sp.q).trim();
   const clubs = clubList(players);
 
   const list = players
     .filter((p) => (!pos || p.pos === pos) && (!club || p.tla === club) && (!maxPrice || p.price <= maxPrice) && p.minutes >= minMins)
     .filter((p) => !fit || p.status === "available")
-    .filter((p) => !q || fold(p.name).includes(q) || fold(p.fullName).includes(q))
+    .filter((p) => !q || anyNameMatches(q, p.name, p.fullName))
     .sort((a, b) => SORTS[sort].get(b) - SORTS[sort].get(a) || b.minutes - a.minutes);
   const shown = list.slice(0, 50);
   // Name typed but filtered out? Find who matched the name, to explain which filter hid them.
-  const hidden = q && !list.length ? players.filter((p) => fold(p.name).includes(q) || fold(p.fullName).includes(q)).slice(0, 3) : [];
+  const hidden = q && !list.length ? players.filter((p) => anyNameMatches(q, p.name, p.fullName)).slice(0, 3) : [];
   const why = (p: Player) =>
     [
       pos && p.pos !== pos && `plays ${POS_LABEL[p.pos].toLowerCase()}`,

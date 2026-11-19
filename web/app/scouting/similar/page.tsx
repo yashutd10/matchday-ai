@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getPlayers, POS_LABEL } from "@/lib/players";
 import { money, NeedsData, playerHref, PlayersHeader, StatusDot } from "@/components/players-ui";
 import { PlayerSearch } from "@/components/player-search";
-import { fold } from "@/lib/text";
+import { anyNameMatches } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Replacement finder" };
 type SP = Promise<Record<string, string | string[] | undefined>>;
@@ -15,9 +15,8 @@ async function Picker({ searchParams }: { searchParams: SP }) {
   const players = await getPlayers();
   if (!players) return <NeedsData />;
 
-  const ql = fold(q);
   const matches = q
-    ? players.filter((p) => fold(p.name).includes(ql) || fold(p.fullName).includes(ql)).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
+    ? players.filter((p) => anyNameMatches(q, p.name, p.fullName)).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
     : [];
   const suggestions = players
     .filter((p) => p.minutes > 0)

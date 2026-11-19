@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { playerHref, teamColor, teamName } from "@/lib/ipl";
+import { fullName, playerHref, teamColor, teamName } from "@/lib/ipl";
 
 export function TeamBadge({ code, size = "md" }: { code: string; size?: "sm" | "md" | "lg" }) {
   const dims = size === "lg" ? "h-14 w-14 text-base" : size === "sm" ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-[11px]";
@@ -20,7 +20,7 @@ export function TeamLink({ code, full, className = "" }: { code: string; full?: 
 /** Player name, linked to his page when he has one (active in the last three seasons). */
 export function PlayerName({ name, className = "" }: { name: string; className?: string }) {
   const href = playerHref(name);
-  return href ? <Link href={href} className={`hover:text-lime hover:underline ${className}`}>{name}</Link> : <span className={className}>{name}</span>;
+  return href ? <Link href={href} className={`hover:text-lime hover:underline ${className}`}>{fullName(name) ?? name}</Link> : <span className={className}>{fullName(name) ?? name}</span>;
 }
 
 /** 0–99 rating chip. Colour says how good; "–" means too few balls to rate. */

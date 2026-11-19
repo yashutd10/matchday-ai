@@ -4,12 +4,13 @@ import type { Metadata } from "next";
 import { FilterArea } from "@/components/filter-area";
 import { IplSearch, type SearchItem } from "@/components/ipl-search";
 import { card, main, PageHeader, PlayerName } from "@/components/ipl-ui";
-import { matchups, minMatchupBalls, players, type Matchup } from "@/lib/ipl";
+import { fullName, matchups, minMatchupBalls, players, type Matchup } from "@/lib/ipl";
 
 export const metadata: Metadata = { title: "IPL matchups" };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? "").trim();
+const nm = (n: string) => fullName(n) ?? n;
 const sr = (m: Matchup) => (m.runs / m.balls) * 100;
 const select = "h-10 rounded-xl border border-line bg-card px-3 text-sm text-ink outline-none focus:border-lime/60";
 
@@ -58,7 +59,7 @@ function Duel({ m }: { m: Matchup }) {
           <div key={l} className="flex flex-col rounded-xl bg-[#10161d] px-3 py-2.5"><span className="text-[11px] text-muted">{l}</span><span className="font-display text-2xl font-bold leading-tight">{val}</span></div>
         ))}
       </div>
-      <p className="text-sm text-soft">In a typical 4-over spell (24 balls) at these rates, <b className="text-ink">{m.bat}</b> would score about <b className="text-ink">{per24.runs}</b> and be out <b className="text-ink">{per24.outs}</b> times. Last met in {m.last}.</p>
+      <p className="text-sm text-soft">In a typical 4-over spell (24 balls) at these rates, <b className="text-ink">{nm(m.bat)}</b> would score about <b className="text-ink">{per24.runs}</b> and be out <b className="text-ink">{per24.outs}</b> times. Last met in {m.last}.</p>
     </section>
   );
 }
@@ -83,7 +84,7 @@ function Table({ rows, who, bat, bowl }: { rows: Matchup[]; who: "bowl" | "bat";
               <tr key={m.bat + m.bowl} className="border-t border-line">
                 <td className="py-2.5 pl-4">
                   <div className="flex flex-col items-start gap-0.5">
-                    <Link href={who === "bowl" ? link(bat, other) : link(other, bowl)} className="font-semibold hover:text-lime hover:underline">{other}</Link>
+                    <Link href={who === "bowl" ? link(bat, other) : link(other, bowl)} className="font-semibold hover:text-lime hover:underline">{nm(other)}</Link>
                     {v ? <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${v.tone}`}>{v.text}</span> : <span className="text-[11px] text-muted">last met {m.last}</span>}
                   </div>
                 </td>
@@ -119,9 +120,12 @@ async function Body({ searchParams }: { searchParams: SP }) {
   const teamOf = new Map(players.map((p) => [p.name, p.team]));
   const batters = new Set<string>(), bowlers = new Set<string>();
   for (const m of matchups) { batters.add(m.bat); bowlers.add(m.bowl); }
-  const batItems: SearchItem[] = [...batters].sort().map((n) => ({ label: n, sub: teamOf.get(n) ?? "", href: link(n, bowl, { sort: one(sp.sort), min: one(sp.min) }) }));
-  const bowlItems: SearchItem[] = [...bowlers].sort().map((n) => ({ label: n, sub: teamOf.get(n) ?? "", href: link(bat, n, { sort: one(sp.sort), min: one(sp.min) }) }));
+  const batItems: SearchItem[] = [...batters].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(n, bowl, { sort: one(sp.sort), min: one(sp.min) }) }));
+  const bowlItems: SearchItem[] = [...bowlers].sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(bat, n, { sort: one(sp.sort), min: one(sp.min) }) }));
 
+  // Typed a bowler in the batter box (or the reverse)? Offer him in his own role.
+  const bowlAsBat: SearchItem[] = [...bowlers].filter((n) => !batters.has(n)).sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link("", n, { sort: one(sp.sort), min: one(sp.min) }) }));
+  const batAsBowl: SearchItem[] = [...batters].filter((n) => !bowlers.has(n)).sort().map((n) => ({ label: n, alt: fullName(n), sub: teamOf.get(n) ?? "", href: link(n, "", { sort: one(sp.sort), min: one(sp.min) }) }));
   const keep = (m: Matchup) => m.balls >= min;
   const order = SORTS[sort].fn;
   const duel = bat && bowl ? matchups.find((m) => m.bat === bat && m.bowl === bowl) : undefined;
@@ -135,18 +139,18 @@ async function Body({ searchParams }: { searchParams: SP }) {
     <>
       <div className={`${card} grid gap-3 p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-end`}>
         <label className="flex flex-col gap-1 text-xs text-muted">Batter
-          <IplSearch key={`bat-${bat}`} items={batItems} placeholder="e.g. Kohli" defaultValue={bat} />
+          <IplSearch key={`bat-${bat}`} items={batItems} placeholder="e.g. Kohli" defaultValue={bat ? nm(bat) : ""} elsewhere={bowlAsBat} elsewhereLabel="Not in the batters list (under 12 balls against any bowler). As a bowler:" />
         </label>
         <span className="hidden pb-3.5 text-sm text-muted sm:block">v</span>
         <label className="flex flex-col gap-1 text-xs text-muted">Bowler
-          <IplSearch key={`bowl-${bowl}`} items={bowlItems} placeholder="e.g. Bumrah" defaultValue={bowl} />
+          <IplSearch key={`bowl-${bowl}`} items={bowlItems} placeholder="e.g. Bumrah" defaultValue={bowl ? nm(bowl) : ""} elsewhere={batAsBowl} elsewhereLabel="Not in the bowlers list. As a batter:" />
         </label>
       </div>
       <p className="-mt-3 text-xs text-muted">Pick a batter, a bowler, or both for their head to head.{(bat || bowl) && <Link href="/ipl/matchups" className="ml-2 text-lime hover:underline">Clear</Link>}</p>
 
       {bat && bowl && (duel
         ? <Duel m={duel} />
-        : <p className={`${card} p-5 text-soft`}>{bat} and {bowl} haven&apos;t faced each other for at least {minMatchupBalls} balls in the IPL.</p>)}
+        : <p className={`${card} p-5 text-soft`}>{nm(bat)} and {nm(bowl)} haven&apos;t faced each other for at least {minMatchupBalls} balls in the IPL.</p>)}
 
       {(bat || bowl) && (
         <FilterArea path="/ipl/matchups">
@@ -194,7 +198,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
               <li key={m.bat + m.bowl}>
                 <Link href={link(m.bat, m.bowl)} className="flex flex-col gap-2 rounded-2xl border border-line bg-card px-4 py-3.5 transition hover:border-[#3a4656]">
                   <div className="flex items-center justify-between gap-2 text-sm font-semibold">
-                    <span className="truncate">{m.bat}</span><span className="shrink-0 text-xs font-normal text-muted">v</span><span className="truncate text-right">{m.bowl}</span>
+                    <span className="truncate">{nm(m.bat)}</span><span className="shrink-0 text-xs font-normal text-muted">v</span><span className="truncate text-right">{nm(m.bowl)}</span>
                   </div>
                   <div className="flex items-baseline justify-between border-t border-line pt-2">
                     <span className="font-display text-2xl font-bold leading-none">{m.runs} <span className="text-sm font-normal text-muted">off {m.balls}</span></span>

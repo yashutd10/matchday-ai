@@ -13,7 +13,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const p = getPlayer((await params).id);
-  return { title: p ? `${p.name} · IPL ratings` : "IPL player" };
+  return { title: p ? `${p.full ?? p.name} · IPL ratings` : "IPL player" };
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -83,7 +83,8 @@ async function IplPlayerPageBody({ params }: { params: Params }) {
         <div className="flex items-center gap-4">
           <TeamBadge code={p.team} size="lg" />
           <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="font-display text-4xl font-bold leading-none md:text-5xl">{p.name}</h1>
+            <h1 className="font-display text-4xl font-bold leading-none md:text-5xl">{p.full ?? p.name}</h1>
+            {p.full && <span className="text-xs text-muted">Scorecard name: {p.name}</span>}
             <span className="text-sm text-soft"><TeamLink code={p.team} full /> · IPL {p.first === p.last ? p.first : `${p.first}–${p.last}`} · {p.matches} matches{p.last !== ipl.latest && ` · last played ${p.last}`}</span>
           </div>
         </div>

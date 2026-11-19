@@ -15,22 +15,25 @@ const select = "h-11 rounded-xl border border-line bg-card px-3 text-sm text-ink
 
 async function List({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-  const kind: Kind = one(sp.kind) === "bowl" ? "bowl" : "bat";
+  const asked: Kind = one(sp.kind) === "bowl" ? "bowl" : "bat";
   const sort = ([...PHASES, "impact"] as string[]).includes(one(sp.sort)) ? (one(sp.sort) as Phase | "impact") : "all";
   const team = one(sp.team).toUpperCase();
   const old = one(sp.old) === "1";
   const q = one(sp.q).trim();
   const teams = [...new Set(players.filter((p) => p.last === ipl.latest).map((p) => p.team))].sort();
 
+  const named = (p: IplPlayer) => !q || nameMatch(q, p.name) >= 0 || (!!p.full && nameMatch(q, p.full) >= 0);
+  const rated = (k: Kind) =>
+    players.filter((p) => Object.keys(p.rating[k]).length > 0 && (old || p.last === ipl.latest) && (!team || p.team === team) && named(p));
+  // Searching a name that only exists on the other list (e.g. "jasprit" while on Batters)? Show that list instead.
+  const switched = !!q && rated(asked).length === 0 && rated(asked === "bat" ? "bowl" : "bat").length > 0;
+  const kind: Kind = switched ? (asked === "bat" ? "bowl" : "bat") : asked;
   const value = (p: IplPlayer) => (sort === "impact" ? p.impact : p.rating[kind][sort] ?? -1);
-  const list = players
-    .filter((p) => Object.keys(p.rating[kind]).length > 0)
-    .filter((p) => (old || p.last === ipl.latest) && (!team || p.team === team) && (!q || nameMatch(q, p.name) >= 0))
-    .sort((a, b) => value(b) - value(a) || (b.rating[kind].all ?? -1) - (a.rating[kind].all ?? -1));
+  const list = rated(kind).sort((a, b) => value(b) - value(a) || (b.rating[kind].all ?? -1) - (a.rating[kind].all ?? -1));
   const shown = list.slice(0, 60);
   const suggestions = players
     .filter((p) => Object.keys(p.rating.bat).length || Object.keys(p.rating.bowl).length || p.last === ipl.latest)
-    .map((p) => ({ label: p.name, sub: `${p.team}${p.type.bat ?? p.type.bowl ? ` · ${p.type.bat ?? p.type.bowl}` : ""}`, href: `/ipl/player/${p.id}` }));
+    .map((p) => ({ label: p.name, alt: p.full, sub: `${p.team}${p.type.bat ?? p.type.bowl ? ` · ${p.type.bat ?? p.type.bowl}` : ""}`, href: `/ipl/player/${p.id}` }));
   const hl = (k: string) => (sort === k ? "font-semibold text-lime" : "");
 
   return (
@@ -53,12 +56,13 @@ async function List({ searchParams }: { searchParams: SP }) {
         </label>
         <div className="flex items-end gap-2">
           <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line px-3 text-sm text-soft">
-            <input type="checkbox" name="old" value="1" defaultChecked={old} className="h-4 w-4 accent-[#c6f432]" /> Include players not in IPL {ipl.latest}
+            <input type="checkbox" name="old" value="1" defaultChecked={old} className="h-4 w-4 accent-[#c6f432]" /> Past players too
           </label>
           <button type="submit" className="h-11 rounded-xl bg-lime px-4 text-sm font-semibold text-pitch">Go</button>
         </div>
       </form>
 
+      {switched && <p className="-mb-3 text-sm text-soft">No {asked === "bat" ? "batters" : "bowlers"} by that name, so showing <b className="text-ink">{kind === "bowl" ? "bowlers" : "batters"}</b>.</p>}
       <p className="text-sm text-muted">
         <span className="hidden font-semibold text-lime group-data-[pending]:inline">Updating… </span>
         {list.length} {kind === "bat" ? "batter" : "bowler"}{list.length === 1 ? "" : "s"}{list.length > 60 ? " · showing the top 60" : ""} · sorted by {sort === "impact" ? "impact" : `${PHASE_LABEL[sort].toLowerCase()} rating`}
@@ -84,7 +88,7 @@ async function List({ searchParams }: { searchParams: SP }) {
                   <td className="py-2.5 pl-4 text-muted">{i + 1}</td>
                   <td className="py-2.5 pr-1">
                     <div className="flex min-w-0 flex-col">
-                      <Link href={`/ipl/player/${p.id}`} className="truncate font-semibold hover:text-lime hover:underline">{p.name}</Link>
+                      <Link href={`/ipl/player/${p.id}`} className="truncate font-semibold hover:text-lime hover:underline" title={p.full}>{p.full ?? p.name}</Link>
                       <span className="truncate text-[11px] text-muted"><TeamLink code={p.team} />{p.last !== ipl.latest && ` · last played ${p.last}`}{p.type[kind] && ` · ${p.type[kind]}`}</span>
                     </div>
                   </td>
@@ -100,7 +104,7 @@ async function List({ searchParams }: { searchParams: SP }) {
       ) : (
         <p className={`${card} p-5 text-soft`}>
           No {kind === "bat" ? "batters" : "bowlers"} match.{" "}
-          {q && players.some((p) => nameMatch(q, p.name) >= 0)
+          {q && players.some((p) => nameMatch(q, p.name) >= 0 || (!!p.full && nameMatch(q, p.full) >= 0))
             ? <>Try {kind === "bat" ? <Link href={`/ipl/players?kind=bowl&q=${encodeURIComponent(q)}&old=1`} className="text-lime hover:underline">bowlers</Link> : <Link href={`/ipl/players?q=${encodeURIComponent(q)}&old=1`} className="text-lime hover:underline">batters</Link>}, or pick him from the suggestions to open his page.</>
             : q ? "Check the spelling, or pick a name from the suggestions as you type." : "Try clearing a filter."}
         </p>

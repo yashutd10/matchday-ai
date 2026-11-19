@@ -42,7 +42,7 @@ export const Icon = ({ d, size = 20 }: { d: string; size?: number }) => (
 );
 
 const isActive = (path: string, href: string) =>
-  href === "/ipl" ? path === "/ipl" || /^\/ipl\/(\d{4}|seasons|team|match)/.test(path) : href === "/ipl/players" ? path.startsWith("/ipl/player") : href === "/" ? path === "/" || path.startsWith("/match") : href === "/table" ? path.startsWith("/table") || path.startsWith("/team") : href === "/stats" ? path.startsWith("/stats") || path.startsWith("/scouting") : path.startsWith(href);
+  href === "/ipl" ? path === "/ipl" || /^\/ipl\/(\d{4}|seasons|team|match\/)/.test(path) : href === "/ipl/players" ? path.startsWith("/ipl/player") : href === "/" ? path === "/" || path.startsWith("/match") : href === "/table" ? path.startsWith("/table") || path.startsWith("/team") : href === "/stats" ? path.startsWith("/stats") || path.startsWith("/scouting") : path.startsWith(href);
 
 export function TopBar() {
   return <TopBarView path={usePathname()} />;

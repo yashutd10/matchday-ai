@@ -280,6 +280,8 @@ def main() -> None:
     print(f"{len(matches)} matches, {balls:,} balls, seasons {min(seasons)}-{max(seasons)}")
     print(f"win model on unseen seasons {ev['testSeasons']}: Brier {ev['brier']} (0.25 = coin flip), right side favoured {ev['accuracy']}% of balls")
     print(f"{extra['players']} active players rated, {extra['pairs']} matchups, {extra['venues']} venues")
+    import build_names
+    build_names.main()
     for f in sorted(OUT.rglob("*.json")):
         print(f"  wrote {f.relative_to(ROOT)} ({f.stat().st_size / 1024:.0f} KB)")
 

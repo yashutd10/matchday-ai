@@ -42,6 +42,7 @@ import insightsJson from "@/data/ipl/insights.json";
 import winJson from "@/data/ipl/winmodel.json";
 import phaseJson from "@/data/ipl/teamphase.json";
 import resultsJson from "@/data/ipl/results.json";
+import namesJson from "@/data/ipl/names.json";
 
 export type Phase = "all" | "pp" | "mid" | "death";
 export const PHASES: Phase[] = ["all", "pp", "mid", "death"];
@@ -58,11 +59,17 @@ export type IplPlayer = {
   rating: Record<Kind, Partial<Record<Phase, number>>>;
   type: { bat: string | null; bowl: string | null };
   impact: number;
+  /** Full name when known, e.g. "Vaibhav Sooryavanshi". */
+  full?: string;
   seasons: { y: number; team: string; m: number; runs: number; sr: number | null; wkts: number; econ: number | null; impact: number }[];
 };
 
+/** Full names ("V Suryavanshi" → "Vaibhav Sooryavanshi"), from the 2027 squad lists. See pipeline/build_names.py. */
+const fullNames = namesJson as Record<string, string>;
+export const fullName = (name: string) => fullNames[name];
+
 const pj = playersJson as unknown as { seasons: number[]; minPhaseBalls: number; players: IplPlayer[] };
-export const players = pj.players;
+export const players = pj.players.map((p) => ({ ...p, full: fullNames[p.name] }));
 export const ratingSeasons = pj.seasons;
 export const minPhaseBalls = pj.minPhaseBalls;
 const byId = new Map(players.map((p) => [p.id, p]));

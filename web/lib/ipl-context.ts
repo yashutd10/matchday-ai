@@ -31,7 +31,7 @@ export function buildIplContext() {
     for (const p of pool) {
       const r = (ph: Phase) => p.rating[kind][ph] ?? "-";
       const st = kind === "bat" ? `${p.recent.bat.all.runs} runs SR ${p.recent.bat.all.sr} avg ${p.recent.bat.all.avg}` : `${p.recent.bowl.all.wkts} wkts econ ${p.recent.bowl.all.econ}`;
-      L.push(`${p.name} | ${p.team} | ${p.type[kind] ?? "-"} | overall ${r("all")} pp ${r("pp")} mid ${r("mid")} death ${r("death")} | ${st} | impact ${(p.impact / 100).toFixed(2)} | career ${kind === "bat" ? `${p.career.bat.runs} runs` : `${p.career.bowl.wkts} wkts`}`);
+      L.push(`${p.name}${p.full ? ` (${p.full})` : ""} | ${p.team} | ${p.type[kind] ?? "-"} | overall ${r("all")} pp ${r("pp")} mid ${r("mid")} death ${r("death")} | ${st} | impact ${(p.impact / 100).toFixed(2)} | career ${kind === "bat" ? `${p.career.bat.runs} runs` : `${p.career.bowl.wkts} wkts`}`);
     }
   };
   L.push(`BATTERS (name | team | type | ratings | ${span} stats | impact | career)`); line("bat");

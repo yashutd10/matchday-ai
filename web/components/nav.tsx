@@ -17,6 +17,7 @@ const iplItems = [
   { href: "/ipl/players", label: "Players", d: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" },
   { href: "/ipl/matchups", label: "Matchups", d: "M7 4l-4 4 4 4M3 8h14M17 12l4 4-4 4M21 16H7" },
   { href: "/ipl/predictor", label: "Predictor", d: "M3 3v18h18M7 15l4-4 3 3 5-6" },
+  { href: "/ipl/auction", label: "Auction", d: "M14 3l7 7-3 3-7-7zM10 7l-7 7 3 3 7-7M3 21h10" },
   { href: "/ipl/insights", label: "Insights", d: "M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0012 3z" },
   { href: "/ipl/ask", label: "Ask AI", d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
 ];

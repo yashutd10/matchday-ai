@@ -116,6 +116,8 @@ def main() -> None:
                 unmatched.append((code, full))
     (OUT / "names.json").write_text(json.dumps(dict(sorted(out.items())), ensure_ascii=False, indent=0), encoding="utf-8")
     print(f"{len(out)} full names written")
+    # The auction planner reads the squads too.
+    (OUT / "squads.json").write_text(json.dumps(squads, ensure_ascii=False, indent=1), encoding="utf-8")
     if ambiguous:
         print("AMBIGUOUS:", ambiguous)
     print(f"{len(unmatched)} squad players not in the rating data (new or rarely played):", ", ".join(f for _, f in unmatched))

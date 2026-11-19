@@ -1,17 +1,34 @@
 import type { Metadata } from "next";
 import { IplPredictor } from "@/components/ipl-predictor";
 import { card, main, PageHeader } from "@/components/ipl-ui";
-import { ipl, winModel } from "@/lib/ipl";
+import { ipl, results, teamColor, teamName, teamPhase, winModel } from "@/lib/ipl";
+import type { PredictorTeam } from "@/components/ipl-predictor";
 
 export const metadata: Metadata = { title: "IPL win predictor" };
 
 export default function IplPredictorPage() {
   const m = winModel, ev = m.evaluation;
   const model = { first: m.first, chase: m.chase, era: m.era[String(m.latest)], parRuns: m.parRuns, parWkts: m.parWkts };
+
+  // Team context: this season's phase numbers, chasing/defending records (last 3 seasons), every meeting.
+  const phase = teamPhase[String(m.latest)] ?? {};
+  const recent = [m.latest - 2, m.latest - 1, m.latest];
+  const all = Object.entries(results).flatMap(([y, rs]) => rs.map((r) => ({ y: Number(y), r })));
+  const decided = all.filter(({ r }) => r.winner && !r.dls && r.scores.length === 2);
+  const teams: PredictorTeam[] = Object.keys(phase).sort().map((code) => {
+    const mine = decided.filter(({ y, r }) => recent.includes(y) && r.teams.includes(code));
+    const chased = mine.filter(({ r }) => r.scores[1].team === code), defended = mine.filter(({ r }) => r.scores[0].team === code);
+    return {
+      code, name: teamName(code), color: teamColor(code), phase: phase[code],
+      chase: { won: chased.filter(({ r }) => r.winner === code).length, n: chased.length },
+      defend: { won: defended.filter(({ r }) => r.winner === code).length, n: defended.length },
+    };
+  });
+  const games: [number, string, string, string][] = decided.map(({ y, r }) => [y, r.scores[0].team, r.scores[1].team, r.winner as string]);
   return (
     <main className={main}>
       <PageHeader title="Win predictor" intro={`Enter any match situation and see each side's chance of winning, learned from every ball of ${ipl.matches.toLocaleString("en-IN")} IPL matches.`} />
-      <IplPredictor model={model} season={m.latest} />
+      <IplPredictor model={model} season={m.latest} teams={teams} games={games} recent={recent} />
 
       <div className="grid gap-5 lg:grid-cols-2 lg:gap-8">
         <section className={`${card} flex flex-col gap-3 p-5 text-sm leading-relaxed text-soft`}>
@@ -21,6 +38,7 @@ export default function IplPredictorPage() {
           <p>“This era” matters: a required rate of 10 was a tall order in 2010 and is routine now. The model adjusts for each season&apos;s scoring rate, so it stays fair across 19 seasons.</p>
           <p>Its weakest spot is the last over: when 10 to 14 are needed, it has been a few points too generous to the chasing side.</p>
           <p>It knows the score, not the players. It can&apos;t tell that the set batter is a finisher, or that the best death bowler still has two overs left.</p>
+          <p id="why-teams" className="scroll-mt-24"><b className="text-ink">Why picking teams doesn&apos;t change the number:</b> we tested it. Rating each side by its recent results, or by the record of the eleven players on the day, the &ldquo;stronger&rdquo; team won only 51&ndash;55% of matches in 2023&ndash;26, barely better than a coin toss. Adding either rating, or how high-scoring the venue is, made the predictions slightly worse on seasons the model hadn&apos;t seen. In the IPL, the score tells you far more than the names. So teams add context, not points.</p>
         </section>
 
         <section className={`${card} flex flex-col gap-3 p-5`}>

@@ -282,6 +282,11 @@ def main() -> None:
     print(f"{extra['players']} active players rated, {extra['pairs']} matchups, {extra['venues']} venues")
     import build_names
     build_names.main()
+    import build_projections
+    proj = build_projections.main(matches, lambda m: int(m["info"]["dates"][0][:4]), OUT)
+    bt = proj["backtest"]["errors"]
+    print(f"{proj['season']} projections for {len(proj['players'])} players; on unseen {proj['backtest']['test']} the model beat the best simple baseline by "
+          f"{bt['sr']['gain']}% (strike rate), {bt['out']['gain']}% (average), {bt['econ']['gain']}% (economy)")
     for f in sorted(OUT.rglob("*.json")):
         print(f"  wrote {f.relative_to(ROOT)} ({f.stat().st_size / 1024:.0f} KB)")
 

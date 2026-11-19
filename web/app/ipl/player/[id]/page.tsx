@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { card, main, PlayerName, Rating, TeamBadge, TeamLink } from "@/components/ipl-ui";
-import { getPlayer, impactText, ipl, matchups, minPhaseBalls, overs, PHASE_LABEL, PHASE_OVERS, PHASES, players, ratingSeasons, teamName, type IplPlayer, type Kind } from "@/lib/ipl";
+import { getPlayer, impactText, ipl, projectionOf, projections, matchups, minPhaseBalls, overs, PHASE_LABEL, PHASE_OVERS, PHASES, players, ratingSeasons, teamName, type IplPlayer, type Kind } from "@/lib/ipl";
 
 type Params = Promise<{ id: string }>;
 
@@ -65,6 +65,40 @@ function PhaseTable({ p, kind }: { p: IplPlayer; kind: Kind }) {
   );
 }
 
+const CONF = { high: "High confidence", medium: "Medium confidence", low: "Low confidence: small sample" } as const;
+function ProjectionCard({ p }: { p: IplPlayer }) {
+  const pr = projectionOf(p.name);
+  if (!pr?.bat && !pr?.bowl) return null;
+  const lg = projections.league;
+  const cell = (label: string, value: string, vs: string, good: boolean | null) => (
+    <div className="flex flex-col rounded-xl bg-[#10161d] px-3 py-2.5">
+      <span className="text-[11px] text-muted">{label}</span>
+      <span className="font-display text-2xl font-bold leading-tight">{value}</span>
+      <span className={`text-[11px] ${good === null ? "text-muted" : good ? "text-[#5ad08f]" : "text-[#ff9a52]"}`}>{vs}</span>
+    </div>
+  );
+  const trend = (d: number | null | undefined, unit: string, lowerBetter = false) =>
+    d === null || d === undefined || Math.abs(d) < (lowerBetter ? 0.1 : 1) ? null : <span className={(lowerBetter ? d < 0 : d > 0) ? "text-[#5ad08f]" : "text-[#ff9a52]"}>{d > 0 ? "▲" : "▼"} {Math.abs(d).toFixed(lowerBetter ? 2 : 1)} {unit} since last year&apos;s projection</span>;
+  return (
+    <section className={`${card} flex flex-col gap-3 p-4 md:p-5`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-2xl font-bold">IPL {projections.season} projection</h2>
+        <Link href="/ipl/insights#projections" className="text-xs text-lime hover:underline">How it&apos;s made →</Link>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {pr.bat && cell("Strike rate", pr.bat.sr.toFixed(0), `league ${lg.sr.toFixed(0)}`, pr.bat.sr >= lg.sr)}
+        {pr.bat && cell("Average", pr.bat.avg.toFixed(1), `league ${lg.avg.toFixed(1)}`, pr.bat.avg >= lg.avg)}
+        {pr.bowl && cell("Economy", pr.bowl.econ.toFixed(2), `league ${lg.econ.toFixed(2)}`, pr.bowl.econ <= lg.econ)}
+      </div>
+      <p className="flex flex-col gap-0.5 text-xs text-muted">
+        {pr.bat && <span>Batting: {CONF[pr.bat.conf]}. {trend(pr.bat.dSr, "strike-rate points")}</span>}
+        {pr.bowl && <span>Bowling: {CONF[pr.bowl.conf]}. {trend(pr.bowl.dEcon, "runs an over", true)}</span>}
+        <span>Built from his last three seasons, recent ones weighted more and pulled toward the league average. Wickets aren&apos;t projected: in testing, nothing beat assuming the league rate.</span>
+      </p>
+    </section>
+  );
+}
+
 async function IplPlayerPageBody({ params }: { params: Params }) {
   const p = getPlayer((await params).id);
   if (!p) notFound();
@@ -96,6 +130,8 @@ async function IplPlayerPageBody({ params }: { params: Params }) {
       </section>
 
       <p className="text-sm text-muted">Ratings (0–99) and phase numbers use IPL {ratingSeasons[0]}–{ipl.latest}. “–” means fewer than {minPhaseBalls} balls in that phase.</p>
+
+      <ProjectionCard p={p} />
 
       <div className={`grid gap-5 ${asBat && asBowl ? "lg:grid-cols-2" : ""}`}>
         {asBat && <PhaseTable p={p} kind="bat" />}

@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { FilterArea } from "@/components/filter-area";
 import { card, main, PageHeader, Rating, TeamLink } from "@/components/ipl-ui";
-import { impactText, ipl, minPhaseBalls, PHASE_LABEL, PHASE_OVERS, PHASES, players, ratingSeasons, teamName, type IplPlayer, type Kind, type Phase } from "@/lib/ipl";
+import { impactText, ipl, minPhaseBalls, projectionOf, projections, PHASE_LABEL, PHASE_OVERS, PHASES, players, ratingSeasons, teamName, type IplPlayer, type Kind, type Phase } from "@/lib/ipl";
 import { nameMatch } from "@/lib/text";
 import { IplSearch } from "@/components/ipl-search";
 
@@ -13,10 +13,17 @@ type SP = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const select = "h-11 rounded-xl border border-line bg-card px-3 text-sm text-ink outline-none focus:border-lime/60";
 
+function ProjCell({ p, kind }: { p: IplPlayer; kind: Kind }) {
+  const pr = projectionOf(p.name);
+  if (kind === "bat" && pr?.bat) return <span className="flex flex-col items-end leading-tight"><span className="font-semibold">SR {pr.bat.sr.toFixed(0)}</span><span className="text-[11px] text-muted">avg {pr.bat.avg.toFixed(0)}{pr.bat.conf === "low" && " · low conf."}</span></span>;
+  if (kind === "bowl" && pr?.bowl) return <span className="flex flex-col items-end leading-tight"><span className="font-semibold">Econ {pr.bowl.econ.toFixed(2)}</span>{pr.bowl.conf === "low" && <span className="text-[11px] text-muted">low conf.</span>}</span>;
+  return <span className="text-muted">–</span>;
+}
+
 async function List({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const asked: Kind = one(sp.kind) === "bowl" ? "bowl" : "bat";
-  const sort = ([...PHASES, "impact"] as string[]).includes(one(sp.sort)) ? (one(sp.sort) as Phase | "impact") : "all";
+  const sort = ([...PHASES, "impact", "proj"] as string[]).includes(one(sp.sort)) ? (one(sp.sort) as Phase | "impact" | "proj") : "all";
   const team = one(sp.team).toUpperCase();
   const old = one(sp.old) === "1";
   const q = one(sp.q).trim();
@@ -28,7 +35,8 @@ async function List({ searchParams }: { searchParams: SP }) {
   // Searching a name that only exists on the other list (e.g. "jasprit" while on Batters)? Show that list instead.
   const switched = !!q && rated(asked).length === 0 && rated(asked === "bat" ? "bowl" : "bat").length > 0;
   const kind: Kind = switched ? (asked === "bat" ? "bowl" : "bat") : asked;
-  const value = (p: IplPlayer) => (sort === "impact" ? p.impact : p.rating[kind][sort] ?? -1);
+  const projValue = (p: IplPlayer) => { const pr = projectionOf(p.name); return kind === "bat" ? pr?.bat?.sr ?? -1 : pr?.bowl ? 100 - pr.bowl.econ : -1; };
+  const value = (p: IplPlayer) => (sort === "impact" ? p.impact : sort === "proj" ? projValue(p) : p.rating[kind][sort] ?? -1);
   const list = rated(kind).sort((a, b) => value(b) - value(a) || (b.rating[kind].all ?? -1) - (a.rating[kind].all ?? -1));
   const shown = list.slice(0, 60);
   const suggestions = players
@@ -46,6 +54,7 @@ async function List({ searchParams }: { searchParams: SP }) {
           <select name="sort" defaultValue={sort} className={select}>
             {PHASES.map((p) => <option key={p} value={p}>{PHASE_LABEL[p]} rating{p !== "all" ? ` (${PHASE_OVERS[p].toLowerCase()})` : ""}</option>)}
             <option value="impact">Impact (wins added)</option>
+            <option value="proj">{projections.season} projection</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">Team
@@ -65,7 +74,7 @@ async function List({ searchParams }: { searchParams: SP }) {
       {switched && <p className="-mb-3 text-sm text-soft">No {asked === "bat" ? "batters" : "bowlers"} by that name, so showing <b className="text-ink">{kind === "bowl" ? "bowlers" : "batters"}</b>.</p>}
       <p className="text-sm text-muted">
         <span className="hidden font-semibold text-lime group-data-[pending]:inline">Updating… </span>
-        {list.length} {kind === "bat" ? "batter" : "bowler"}{list.length === 1 ? "" : "s"}{list.length > 60 ? " · showing the top 60" : ""} · sorted by {sort === "impact" ? "impact" : `${PHASE_LABEL[sort].toLowerCase()} rating`}
+        {list.length} {kind === "bat" ? "batter" : "bowler"}{list.length === 1 ? "" : "s"}{list.length > 60 ? " · showing the top 60" : ""} · sorted by {sort === "impact" ? "impact" : sort === "proj" ? `${projections.season} projected ${kind === "bat" ? "strike rate" : "economy"}` : `${PHASE_LABEL[sort].toLowerCase()} rating`}
         {(kind !== "bat" || sort !== "all" || team || old || q) && <Link href="/ipl/players" className="ml-3 text-lime hover:underline">Clear</Link>}
       </p>
 
@@ -79,6 +88,7 @@ async function List({ searchParams }: { searchParams: SP }) {
                 {PHASES.map((p) => <th key={p} className={`w-11 py-3 text-center font-normal sm:w-14 ${hl(p)}`} title={PHASE_OVERS[p]}>{p === "all" ? "All" : p === "pp" ? "PP" : PHASE_LABEL[p].slice(0, 3)}{sort === p && " ▾"}</th>)}
                 <th className="hidden py-3 pl-3 text-right font-normal md:table-cell">{kind === "bat" ? "Runs" : "Wkts"}</th>
                 <th className="hidden py-3 pl-3 text-right font-normal md:table-cell">{kind === "bat" ? "SR" : "Econ"}</th>
+                <th className={`hidden py-3 pl-3 text-right font-normal lg:table-cell ${hl("proj")}`} title={`Projected for IPL ${projections.season}`}>{projections.season} proj.{sort === "proj" && " ▾"}</th>
                 <th className={`hidden py-3 pr-4 pl-3 text-right font-normal sm:table-cell ${hl("impact")}`} title="Wins added over the rating seasons">Impact{sort === "impact" && " ▾"}</th>
               </tr>
             </thead>
@@ -95,6 +105,7 @@ async function List({ searchParams }: { searchParams: SP }) {
                   {PHASES.map((ph) => <td key={ph} className="py-2.5 text-center"><Rating value={p.rating[kind][ph]} active={sort === ph} /></td>)}
                   <td className="hidden py-2.5 pl-3 text-right md:table-cell">{kind === "bat" ? p.recent.bat.all.runs : p.recent.bowl.all.wkts}</td>
                   <td className="hidden py-2.5 pl-3 text-right text-soft md:table-cell">{kind === "bat" ? p.recent.bat.all.sr.toFixed(1) : p.recent.bowl.all.econ.toFixed(2)}</td>
+                  <td className="hidden py-2.5 pl-3 text-right lg:table-cell"><ProjCell p={p} kind={kind} /></td>
                   <td className={`hidden py-2.5 pr-4 pl-3 text-right sm:table-cell ${p.impact > 0 ? "text-[#5ad08f]" : "text-[#ff8a8a]"}`}>{impactText(p.impact)}</td>
                 </tr>
               ))}

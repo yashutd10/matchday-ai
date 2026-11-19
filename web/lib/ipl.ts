@@ -43,6 +43,7 @@ import winJson from "@/data/ipl/winmodel.json";
 import phaseJson from "@/data/ipl/teamphase.json";
 import resultsJson from "@/data/ipl/results.json";
 import namesJson from "@/data/ipl/names.json";
+import projJson from "@/data/ipl/projections.json";
 
 export type Phase = "all" | "pp" | "mid" | "death";
 export const PHASES: Phase[] = ["all", "pp", "mid", "death"];
@@ -105,3 +106,19 @@ export const getResult = (id: string) => { const y = seasonOfMatch.get(id); retu
 
 export const teamCodes = Object.keys(data.teams);
 export const impactText = (v: number) => `${v > 0 ? "+" : ""}${(v / 100).toFixed(2)}`;
+
+/* ---------- next-season projections (see pipeline/build_projections.py) ---------- */
+export type Confidence = "high" | "medium" | "low";
+export type Projection = {
+  bat?: { sr: number; avg: number; balls: number; conf: Confidence; dSr: number | null };
+  bowl?: { econ: number; balls: number; conf: Confidence; dEcon: number | null };
+};
+type BtRow = { model: number; last: number; avg3: number; league: number; gain: number };
+export const projections = projJson as unknown as {
+  season: number; base: number; league: { sr: number; econ: number; avg: number };
+  players: Record<string, Projection>;
+  risers: { bat: [string, number][]; bowl: [string, number][] };
+  fallers: { bat: [string, number][]; bowl: [string, number][] };
+  backtest: { tune: number; test: number; errors: Record<"sr" | "out" | "econ" | "wkt", BtRow> };
+};
+export const projectionOf = (name: string): Projection | undefined => projections.players[name];

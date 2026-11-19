@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { card, main, PageHeader, PlayerName, TeamLink } from "@/components/ipl-ui";
-import { impactText, insights, ipl, type Venue } from "@/lib/ipl";
+import { getPlayer, impactText, insights, ipl, playerHref, projections, type Venue } from "@/lib/ipl";
 
 export const metadata: Metadata = { title: "IPL insights" };
 
@@ -99,6 +99,39 @@ export default function IplInsights() {
         </div>
       </section>
 
+      <section id="projections" className="flex scroll-mt-24 flex-col gap-3">
+        <h2 className="font-display text-2xl font-bold">Heading into IPL {projections.season}</h2>
+        <p className="-mt-1 text-sm text-soft">Whose projection moved most after {projections.base}. Projections use each player&apos;s last three seasons, weighted toward the most recent and pulled toward the league average, so one big season moves a player a bit, not all the way.</p>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Movers title="Batters rising" rows={projections.risers.bat} unit="SR" good />
+          <Movers title="Batters falling" rows={projections.fallers.bat} unit="SR" />
+          <Movers title="Bowlers improving" rows={projections.risers.bowl} unit="econ" good bowl />
+          <Movers title="Bowlers slipping" rows={projections.fallers.bowl} unit="econ" bowl />
+        </div>
+        <details className={`${card} p-4 text-sm text-soft`}>
+          <summary className="cursor-pointer font-semibold text-ink">How good are the projections?</summary>
+          <p className="mt-2">Tuned on {projections.backtest.tune}, then tested on {projections.backtest.test}, a season they hadn&apos;t seen. Typical error per player (lower is better):</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
+              <thead><tr className="text-xs text-muted"><th className="py-2 text-left font-normal">Stat</th><th className="py-2 text-right font-normal">Projection</th><th className="py-2 text-right font-normal">Same as last season</th><th className="py-2 text-right font-normal">3-season average</th><th className="py-2 text-right font-normal">Everyone average</th></tr></thead>
+              <tbody>
+                {([["sr", "Strike rate"], ["out", "Dismissals per 20 overs faced"], ["econ", "Economy"], ["wkt", "Wickets per 4 overs"]] as const).map(([k, label]) => {
+                  const e = projections.backtest.errors[k];
+                  return (
+                    <tr key={k} className="border-t border-line">
+                      <td className="py-2">{label}</td>
+                      <td className={`py-2 text-right font-semibold ${e.gain > 0 ? "text-lime" : "text-[#ff9a52]"}`}>{e.model}</td>
+                      <td className="py-2 text-right">{e.last}</td><td className="py-2 text-right">{e.avg3}</td><td className="py-2 text-right">{e.league}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2">The projections beat every simple method for strike rate ({projections.backtest.errors.sr.gain}% better than the next best), dismissal rate ({projections.backtest.errors.out.gain}%) and economy ({projections.backtest.errors.econ.gain}%). For wickets, nothing beat assuming every bowler takes them at the league rate, so wickets aren&apos;t projected. One IPL season is a small sample: expect real surprises.</p>
+        </details>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-2xl font-bold">Grounds</h2>
         {byScore.length > 1 && (
@@ -153,6 +186,25 @@ function GroundTable({ rows, recent }: { rows: Venue[]; recent?: boolean }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function Movers({ title, rows, unit, good, bowl }: { title: string; rows: [string, number][]; unit: string; good?: boolean; bowl?: boolean }) {
+  return (
+    <div className={`${card} flex flex-col p-4`}>
+      <h3 className="mb-2 text-sm font-semibold">{title}</h3>
+      <ol className="flex flex-col">
+        {rows.map(([name, d]) => {
+          const p = getPlayer(playerHref(name)?.split("/").pop() ?? "");
+          return (
+            <li key={name} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-sm first:border-t-0">
+              <span className="flex min-w-0 flex-col"><PlayerName name={name} className="truncate font-semibold" />{p && <span className="text-[11px] text-muted">{p.team}</span>}</span>
+              <span className={`shrink-0 text-xs font-semibold ${good ? "text-[#5ad08f]" : "text-[#ff9a52]"}`}>{d > 0 ? "+" : ""}{bowl ? d.toFixed(2) : d.toFixed(1)} {unit}</span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

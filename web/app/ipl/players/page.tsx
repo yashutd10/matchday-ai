@@ -38,7 +38,7 @@ async function List({ searchParams }: { searchParams: SP }) {
 
   return (
     <FilterArea path="/ipl/players">
-      <form key={[kind, sort, team, old, q].join("|")} action="/ipl/players" className={`${card} grid gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-5`}>
+      <form key={[kind, sort, team, old, q].join("|")} action="/ipl/players" className={`${card} grid gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.2fr_auto]`}>
         <label className="flex flex-col gap-1 text-xs text-muted">Rate as
           <select name="kind" defaultValue={kind} className={select}><option value="bat">Batters</option><option value="bowl">Bowlers</option></select>
         </label>
@@ -55,7 +55,7 @@ async function List({ searchParams }: { searchParams: SP }) {
           <IplSearch name="q" items={suggestions} defaultValue={q} placeholder="e.g. Kohli" className={`${select} w-full placeholder:text-[#8a94a3]`} />
         </label>
         <div className="flex items-end gap-2">
-          <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line px-3 text-sm text-soft">
+          <label className="flex h-11 flex-1 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl border border-line px-3 text-sm text-soft hover:text-ink">
             <input type="checkbox" name="old" value="1" defaultChecked={old} className="h-4 w-4 accent-[#c6f432]" /> Past players too
           </label>
           <button type="submit" className="h-11 rounded-xl bg-lime px-4 text-sm font-semibold text-pitch">Go</button>
